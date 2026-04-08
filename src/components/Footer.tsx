@@ -77,8 +77,8 @@ export default function Footer() {
               <li>81 W. 37th Ave.</li>
               <li>San Mateo, CA 94403</li>
               <li>
-                <a href="tel:+15551234567" className="hover:text-romolo-red transition-colors">
-                  (555) 123-4567
+                <a href="tel:+16505740625" className="hover:text-romolo-red transition-colors">
+                  (650) 574-0625
                 </a>
               </li>
               <li>

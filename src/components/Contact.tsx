@@ -42,7 +42,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-romolo-charcoal">Phone</p>
-                  <p className="text-sm text-romolo-warm-gray">(555) 123-4567</p>
+                  <p className="text-sm text-romolo-warm-gray">(650) 574-0625</p>
                 </div>
               </div>
 
