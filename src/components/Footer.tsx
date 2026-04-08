@@ -127,12 +127,22 @@ export default function Footer() {
           <p className="text-xs text-white/30">
             &copy; {new Date().getFullYear()} Romolo&apos;s Cannoli. All rights reserved.
           </p>
-          <div className="flex gap-6 text-xs text-white/30">
-            <a href="#" className="hover:text-white/60 transition-colors">
-              Privacy Policy
-            </a>
-            <a href="#" className="hover:text-white/60 transition-colors">
-              Terms of Service
+          <div className="flex flex-col items-center sm:items-end gap-3">
+            <div className="flex gap-6 text-xs text-white/30">
+              <a href="#" className="hover:text-white/60 transition-colors">
+                Privacy Policy
+              </a>
+              <a href="#" className="hover:text-white/60 transition-colors">
+                Terms of Service
+              </a>
+            </div>
+            <a
+              href="https://vaderlabs.co/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-white/30 hover:text-white/60 transition-colors"
+            >
+              Design by Vader Labs
             </a>
           </div>
         </div>

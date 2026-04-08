@@ -24,7 +24,7 @@ export default function Heritage() {
             <img
               src="https://res.cloudinary.com/dhv6sobkv/image/upload/v1775679180/Nonni_cc9rny.avif"
               alt="Nonno Romolo in his original Sicilian pastry shop, circa 1965"
-              className="block rounded-sm border-4 border-romolo-blue"
+              className="block rounded-sm border-2 border-romolo-blue"
             />
           </div>
 
