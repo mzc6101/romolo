@@ -55,7 +55,9 @@ export default function Contact() {
                 <div>
                   <p className="text-sm font-medium text-romolo-charcoal">Hours</p>
                   <p className="text-sm text-romolo-warm-gray">
-                    Tue — Sun: 9:00 AM — 6:00 PM
+                    Tue — Sat: 11:00 AM — 6:00 PM
+                    <br />
+                    Sun: 12:00 PM — 4:00 PM
                     <br />
                     Monday: Closed
                   </p>

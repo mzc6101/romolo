@@ -1,15 +1,18 @@
+import Image from "next/image";
+
 export default function Hero() {
   return (
     <section className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden">
-      {/* Background placeholder */}
       <div className="absolute inset-0 bg-romolo-charcoal">
+        <Image
+          src="https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775678635/_N8Z0762_bsvral.jpg"
+          alt=""
+          fill
+          priority
+          className="object-cover"
+          aria-hidden="true"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
-        {/* Placeholder for hero image — replace this div with an <Image> later */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-white/20 text-sm tracking-widest uppercase">
-            [ Hero Background Image — Cannoli Workshop / Italian Street Scene ]
-          </span>
-        </div>
       </div>
 
       {/* Content */}
@@ -20,7 +23,7 @@ export default function Hero() {
         </div>
 
         <p className="font-[var(--font-sans)] text-[11px] md:text-[13px] tracking-[0.3em] uppercase text-white/70 mb-6">
-          Authentic Sicilian Cannoli Since 1965
+          Authentic Sicilian Treats Since 1968
         </p>
 
         <h1 className="font-[var(--font-serif)] text-6xl md:text-8xl lg:text-9xl font-light text-white leading-[0.9] mb-6">
@@ -30,8 +33,8 @@ export default function Hero() {
         </h1>
 
         <p className="font-[var(--font-serif)] text-lg md:text-xl text-white/80 font-light italic max-w-lg mx-auto mb-10">
-          &ldquo;Every shell cracked, every filling piped — by hand, with love,
-          as Nonno Romolo taught us.&rdquo;
+          &ldquo;Quote — Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+          Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.&rdquo;
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

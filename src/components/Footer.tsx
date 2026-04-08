@@ -74,8 +74,8 @@ export default function Footer() {
               Contact
             </h5>
             <ul className="space-y-3 text-sm text-white/60">
-              <li>123 Mulberry Street</li>
-              <li>Little Italy, NY 10013</li>
+              <li>81 W. 37th Ave.</li>
+              <li>San Mateo, CA 94403</li>
               <li>
                 <a href="tel:+15551234567" className="hover:text-romolo-red transition-colors">
                   (555) 123-4567

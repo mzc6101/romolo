@@ -3,18 +3,19 @@ export default function Location() {
     <section id="location" className="py-24 md:py-36 bg-romolo-blue">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
-          {/* Map placeholder */}
+          {/* Google Maps Embed */}
           <div className="animate-on-scroll order-2 lg:order-1">
-            <div className="aspect-[4/3] bg-white/60 rounded-sm flex items-center justify-center border border-white/80">
-              <div className="text-center p-8">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 mx-auto mb-4 text-romolo-warm-gray/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                </svg>
-                <p className="text-romolo-warm-gray text-sm tracking-wide">
-                  [ Google Maps Embed — Store Location ]
-                </p>
-              </div>
+            <div className="aspect-[4/3] rounded-sm overflow-hidden border border-white/80">
+              <iframe
+                src="https://maps.google.com/maps?q=81+37th+Ave,+San+Mateo,+CA+94403&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Romolo's Cannoli location - 81 37th Ave, San Mateo, CA 94403"
+              />
             </div>
           </div>
 
@@ -36,11 +37,9 @@ export default function Location() {
                   Address
                 </h3>
                 <p className="font-[var(--font-serif)] text-xl text-romolo-charcoal leading-relaxed">
-                  123 Mulberry Street
+                  81 W. 37th Ave.
                   <br />
-                  Little Italy, New York
-                  <br />
-                  NY 10013
+                  San Mateo, CA 94403
                 </p>
               </div>
 
@@ -51,9 +50,8 @@ export default function Location() {
                 </h3>
                 <div className="space-y-2">
                   {[
-                    { day: "Tuesday — Friday", hours: "9:00 AM — 6:00 PM" },
-                    { day: "Saturday", hours: "8:00 AM — 7:00 PM" },
-                    { day: "Sunday", hours: "10:00 AM — 4:00 PM" },
+                    { day: "Tuesday — Saturday", hours: "11:00 AM — 6:00 PM" },
+                    { day: "Sunday", hours: "12:00 PM — 4:00 PM" },
                     { day: "Monday", hours: "Closed" },
                   ].map((row) => (
                     <div key={row.day} className="flex justify-between items-center py-2 border-b border-white/50">
@@ -76,9 +74,9 @@ export default function Location() {
               <div className="bg-white/50 p-5 rounded-sm border border-white/80">
                 <p className="text-sm text-romolo-warm-gray leading-relaxed">
                   <span className="font-medium text-romolo-charcoal">Getting here: </span>
-                  Street parking available on Mulberry St. Nearest subway: Spring St
-                  (6 train) or Bowery (J/Z). We&apos;re the shop with the red awning —
-                  you can&apos;t miss it.
+                  Street parking available on W. 37th Ave. and nearby. The Hillsdale
+                  Caltrain station is a short walk. We&apos;re the shop with the red awning
+                  — you can&apos;t miss it.
                 </p>
               </div>
             </div>

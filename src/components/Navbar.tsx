@@ -54,7 +54,7 @@ export default function Navbar() {
                   scrolled ? "text-romolo-red" : "text-white"
                 }`}
               >
-                Romolo&apos;s
+                Romolo&apos;s Cannoli
               </span>
             </a>
 

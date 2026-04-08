@@ -19,48 +19,42 @@ export default function Heritage() {
 
         {/* Two-column layout */}
         <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
-          {/* Image placeholder */}
+          {/* Heritage image */}
           <div className="animate-on-scroll">
-            <div className="aspect-[4/5] bg-romolo-cream rounded-sm flex items-center justify-center border border-romolo-border">
-              <div className="text-center p-8">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-romolo-border flex items-center justify-center">
-                  <span className="text-romolo-warm-gray text-2xl">&#128247;</span>
-                </div>
-                <p className="text-romolo-warm-gray text-sm tracking-wide">
-                  [ Heritage Photo — Nonno Romolo in his original Sicilian pastry shop, circa 1965 ]
-                </p>
-              </div>
-            </div>
+            <img
+              src="https://res.cloudinary.com/dhv6sobkv/image/upload/v1775679180/Nonni_cc9rny.avif"
+              alt="Nonno Romolo in his original Sicilian pastry shop, circa 1965"
+              className="block rounded-sm border-4 border-romolo-blue"
+            />
           </div>
 
           {/* Story content */}
           <div className="animate-on-scroll delay-2">
             <span className="font-[var(--font-serif)] text-8xl md:text-9xl font-light text-romolo-blue leading-none block mb-2">
-              1965
+              1968
             </span>
             <h3 className="font-[var(--font-serif)] text-2xl md:text-3xl font-light text-romolo-charcoal mb-6">
-              From a small kitchen in Palermo <br className="hidden md:block" />
-              to your table
+              Lorem ipsum dolor sit amet <br className="hidden md:block" />
+              consectetur adipiscing elit
             </h3>
             <div className="space-y-5 text-romolo-warm-gray leading-relaxed">
               <p>
-                In 1965, Romolo Ferrara opened a tiny pastry shop on a cobblestone
-                street in Palermo, Sicily. Armed with nothing but his
-                grandmother&apos;s recipe and an unwavering belief that the best
-                cannoli should shatter at first bite, he began a tradition that
-                would span three generations.
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
+                eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
+                ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+                aliquip ex ea commodo consequat.
               </p>
               <p>
-                His secret was simple: the finest fresh ricotta, hand-rolled shells
-                fried to golden perfection, and a filling so creamy it would make
-                the angels weep. Word spread from neighbor to neighbor, street to
-                street, until &ldquo;Romolo&apos;s&rdquo; became synonymous with
-                the very best cannoli in all of Sicily.
+                Duis aute irure dolor in reprehenderit in voluptate velit esse
+                cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
+                cupidatat non proident, sunt in culpa qui officia deserunt mollit
+                anim id est laborum.
               </p>
               <p>
-                Today, the Ferrara family continues Nonno Romolo&apos;s legacy —
-                using the same time-honored techniques, the same devotion to
-                quality, and the same love that started it all over sixty years ago.
+                Sed ut perspiciatis unde omnis iste natus error sit voluptatem
+                accusantium doloremque laudantium, totam rem aperiam, eaque ipsa
+                quae ab illo inventore veritatis et quasi architecto beatae vitae
+                dicta sunt explicabo.
               </p>
             </div>
 
