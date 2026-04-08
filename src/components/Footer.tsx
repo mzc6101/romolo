@@ -44,7 +44,7 @@ export default function Footer() {
               Romolo&apos;s
             </h4>
             <p className="text-sm text-white/50 leading-relaxed max-w-xs">
-              Handcrafted Sicilian cannoli made with love since 1965. Three
+              Handcrafted Sicilian desserts made with love since 1968. Three
               generations, one recipe, infinite passion.
             </p>
           </div>

@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   title: "Romolo's Cannoli | Authentic Italian Cannoli Since 1965",
   description:
     "Handcrafted Sicilian cannoli made with love for over 60 years. Fresh ricotta, crispy shells, and traditional family recipes passed down through generations.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
