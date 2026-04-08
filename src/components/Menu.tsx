@@ -1,79 +1,61 @@
 const menuItems = [
   {
-    category: "Classic Cannoli",
+    category: "Cannoli",
     items: [
       {
-        name: "Ricotta Classico",
-        description: "Traditional sweet ricotta filling with candied citrus peel",
-        price: "$4.50",
-        placeholder: "[ Cannoli Image ]",
+        name: "Cannoli",
+        description: "Crispy shell filled to order with sweet ricotta — available in Full Size or Mini",
+        price: "$X.XX",
       },
       {
-        name: "Pistachio Dream",
-        description: "Ricotta with Bronte pistachio cream and crushed pistachios",
-        price: "$5.50",
-        placeholder: "[ Cannoli Image ]",
-      },
-      {
-        name: "Cioccolato Fondente",
-        description: "Dark chocolate ricotta with cocoa nibs and chocolate chips",
-        price: "$5.00",
-        placeholder: "[ Cannoli Image ]",
-      },
-      {
-        name: "Limone di Amalfi",
-        description: "Lemon-infused ricotta with candied lemon zest",
-        price: "$5.00",
-        placeholder: "[ Cannoli Image ]",
+        name: "Cannoli Kit",
+        description: "Shells and filling to assemble at home — must be purchased in multiples of 6",
+        price: "$X.XX",
       },
     ],
   },
   {
-    category: "Signature Creations",
+    category: "Desserts",
     items: [
       {
-        name: "The Nonno Romolo",
-        description: "Our original 1965 recipe — pure ricotta, orange blossom, powdered sugar",
-        price: "$6.00",
-        tag: "Signature",
-        placeholder: "[ Cannoli Image ]",
+        name: "Chocolate Banana",
+        description: "Frozen banana dipped in rich chocolate",
+        price: "$X.XX",
       },
       {
-        name: "Cannolo Reale",
-        description: "Mascarpone and ricotta blend with amarena cherries and gold leaf",
-        price: "$8.00",
-        tag: "Premium",
-        placeholder: "[ Cannoli Image ]",
+        name: "Cookie",
+        description: "Flavors: Amaretti, Rainbow, Cucidati",
+        price: "$X.XX",
+      },
+      {
+        name: "Spumoni Wedge",
+        description: "Classic Italian tri-color ice cream with candied fruit and nuts",
+        price: "$X.XX",
+      },
+      {
+        name: "Tartufi",
+        description: "Chocolate-coated ice cream truffle with a molten center",
+        price: "$X.XX",
+      },
+      {
+        name: "Tiramisu",
+        description: "Espresso-soaked ladyfingers layered with mascarpone cream",
+        price: "$X.XX",
       },
     ],
   },
   {
-    category: "Dolci & More",
+    category: "Frozen Treats",
     items: [
       {
-        name: "Sfogliatella",
-        description: "Crispy layered pastry with sweet semolina and ricotta filling",
-        price: "$5.50",
-        placeholder: "[ Pastry Image ]",
+        name: "Ice Cream",
+        description: "Rich, creamy Italian-style ice cream in rotating flavors",
+        price: "$X.XX",
       },
       {
-        name: "Tiramisu Cup",
-        description: "Individual tiramisu with espresso-soaked savoiardi and mascarpone",
-        price: "$7.00",
-        placeholder: "[ Dessert Image ]",
-      },
-      {
-        name: "Espresso",
-        description: "Traditional Italian espresso, single or double",
-        price: "$3.50",
-        placeholder: "[ Coffee Image ]",
-      },
-      {
-        name: "Cannoli Box (6 pcs)",
-        description: "Assorted selection of our finest cannoli, beautifully boxed",
-        price: "$28.00",
-        tag: "Gift",
-        placeholder: "[ Box Image ]",
+        name: "Milkshake",
+        description: "Thick and creamy, blended with our house-made ice cream",
+        price: "$X.XX",
       },
     ],
   },
@@ -89,14 +71,13 @@ export default function Menu() {
             Il Menu
           </p>
           <h2 className="font-[var(--font-serif)] text-4xl md:text-6xl font-light text-romolo-charcoal">
-            Our <span className="italic">Cannoli</span>
+            Our <span className="italic">Menu</span>
           </h2>
           <div className="ornament-divider mt-6">
             <span className="text-romolo-red text-lg">&#10045;</span>
           </div>
           <p className="mt-6 max-w-2xl mx-auto text-romolo-warm-gray leading-relaxed">
             Each cannolo is filled to order to preserve that perfect crunch.
-            Prices subject to seasonal availability.
           </p>
         </div>
 
@@ -118,30 +99,25 @@ export default function Menu() {
                     {/* Image placeholder */}
                     <div className="w-20 h-20 shrink-0 bg-romolo-cream rounded-sm flex items-center justify-center border border-romolo-border group-hover:border-romolo-red/20 transition-colors">
                       <span className="text-[10px] text-romolo-warm-gray text-center leading-tight px-1">
-                        {item.placeholder}
+                        [ Image ]
                       </span>
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-[var(--font-serif)] text-lg font-medium text-romolo-charcoal">
-                            {item.name}
-                          </h4>
-                          {"tag" in item && item.tag && (
-                            <span className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 bg-romolo-red/10 text-romolo-red rounded-sm font-medium">
-                              {item.tag}
-                            </span>
-                          )}
-                        </div>
+                        <h4 className="font-[var(--font-serif)] text-lg font-medium text-romolo-charcoal">
+                          {item.name}
+                        </h4>
                         <span className="font-[var(--font-serif)] text-lg text-romolo-red font-semibold shrink-0">
                           {item.price}
                         </span>
                       </div>
-                      <p className="text-sm text-romolo-warm-gray mt-1 leading-relaxed">
-                        {item.description}
-                      </p>
+                      {item.description && (
+                        <p className="text-sm text-romolo-warm-gray mt-1 leading-relaxed">
+                          {item.description}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
