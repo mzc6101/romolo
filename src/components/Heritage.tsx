@@ -1,20 +1,42 @@
 export default function Heritage() {
   return (
-    <section id="heritage" className="py-24 md:py-36 bg-white">
-      <div className="max-w-7xl mx-auto px-6 lg:px-10">
+    <section id="heritage" className="relative py-24 md:py-36 bg-romolo-cream overflow-hidden">
+      {/* Aged B&W photographic backdrop */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "url('https://res.cloudinary.com/dhv6sobkv/image/upload/v1775679180/Nonni_cc9rny.avif')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "grayscale(1) contrast(1.1) brightness(0.95)",
+          opacity: 0.15,
+        }}
+      />
+      {/* Vignette for depth */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(250,248,245,0) 40%, rgba(26,26,26,0.22) 100%)",
+        }}
+      />
+      <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         {/* Section header */}
-        <div className="text-center mb-20 animate-on-scroll">
-          <p className="text-[11px] tracking-[0.3em] uppercase text-romolo-red font-medium mb-4">
-            Our Heritage
-          </p>
-          <h2 className="font-[var(--font-serif)] text-4xl md:text-6xl font-light text-romolo-charcoal">
+        <div className="mb-16 md:mb-24 animate-on-scroll">
+          <div className="flex items-center gap-6 mb-8">
+            <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60" />
+            <p className="text-base md:text-xl tracking-[0.3em] uppercase text-romolo-red font-medium">
+              Our Heritage
+            </p>
+          </div>
+          <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
             60 Years of
             <br />
             <span className="italic">Tradition</span>
           </h2>
-          <div className="ornament-divider mt-6">
-            <span className="text-romolo-red text-lg">&#10045;</span>
-          </div>
         </div>
 
         {/* Two-column layout */}
