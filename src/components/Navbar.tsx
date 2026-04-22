@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 const navLinks = [
   { label: "Heritage", href: "#heritage" },
@@ -43,12 +44,21 @@ export default function Navbar() {
             {/* Logo */}
             <a
               href="#"
-              className="flex items-center gap-2 group"
+              className="relative flex items-center gap-2 group"
               onClick={(e) => {
                 e.preventDefault();
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             >
+              <Image
+                src="/RmLogo.png"
+                alt="Romolo logo"
+                width={140}
+                height={36}
+                className={`hidden xl:block absolute right-full mr-5 h-8 w-auto object-contain pointer-events-none select-none transition-opacity duration-500 ${
+                  scrolled ? "opacity-100" : "opacity-0"
+                }`}
+              />
               <span
                 className={`font-[var(--font-serif)] text-xl lg:text-2xl font-semibold tracking-wide transition-colors duration-500 ${
                   scrolled ? "text-romolo-red" : "text-white"
