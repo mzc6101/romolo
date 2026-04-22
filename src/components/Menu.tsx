@@ -66,17 +66,17 @@ export default function Menu() {
     <section id="menu" className="py-24 md:py-36 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         {/* Section header */}
-        <div className="text-center mb-20 animate-on-scroll">
-          <p className="text-[11px] tracking-[0.3em] uppercase text-romolo-red font-medium mb-4">
-            Il Menu
-          </p>
-          <h2 className="font-[var(--font-serif)] text-4xl md:text-6xl font-light text-romolo-charcoal">
+        <div className="mb-16 md:mb-24 animate-on-scroll">
+          <div className="flex items-center gap-6 mb-8">
+            <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60" />
+            <p className="text-base md:text-xl tracking-[0.3em] uppercase text-romolo-red font-medium">
+              Il Menu
+            </p>
+          </div>
+          <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
             Our <span className="italic">Menu</span>
           </h2>
-          <div className="ornament-divider mt-6">
-            <span className="text-romolo-red text-lg">&#10045;</span>
-          </div>
-          <p className="mt-6 max-w-2xl mx-auto text-romolo-warm-gray leading-relaxed">
+          <p className="mt-10 max-w-2xl text-[17px] text-romolo-warm-gray leading-relaxed">
             Each cannolo is filled to order to preserve that perfect crunch.
           </p>
         </div>

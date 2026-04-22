@@ -44,19 +44,19 @@ export default function Process() {
     <section id="process" className="py-24 md:py-36 bg-romolo-blue">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         {/* Section header */}
-        <div className="text-center mb-20 animate-on-scroll">
-          <p className="text-[11px] tracking-[0.3em] uppercase text-romolo-red font-medium mb-4">
-            Our Process
-          </p>
-          <h2 className="font-[var(--font-serif)] text-4xl md:text-6xl font-light text-romolo-charcoal">
+        <div className="mb-16 md:mb-24 animate-on-scroll">
+          <div className="flex items-center gap-6 mb-8">
+            <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60" />
+            <p className="text-base md:text-xl tracking-[0.3em] uppercase text-romolo-red font-medium">
+              Our Process
+            </p>
+          </div>
+          <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
             Made by Hand,
             <br />
             <span className="italic">With Heart</span>
           </h2>
-          <div className="ornament-divider mt-6">
-            <span className="text-romolo-red text-lg">&#10045;</span>
-          </div>
-          <p className="mt-6 max-w-2xl mx-auto text-romolo-warm-gray leading-relaxed">
+          <p className="mt-10 max-w-2xl text-[17px] text-romolo-warm-gray leading-relaxed">
             Every cannoli that leaves our kitchen follows the same four-step
             process that Nonno Romolo perfected over six decades. No machines, no
             mass production — just patience and passion.
@@ -68,26 +68,35 @@ export default function Process() {
           {steps.map((step, i) => (
             <div
               key={step.number}
-              className={`animate-on-scroll delay-${i + 1}`}
+              className={`group animate-on-scroll delay-${i + 1} transition-transform duration-500 ease-out hover:-translate-y-1`}
             >
               {/* Step image */}
-              <div className="aspect-square bg-white/60 rounded-sm mb-6 border border-white/80 backdrop-blur-sm overflow-hidden relative">
+              <div className="relative aspect-square mb-6 overflow-hidden rounded-sm ring-1 ring-white/70 shadow-lg shadow-romolo-charcoal/10 transition-shadow duration-500 ease-out group-hover:shadow-xl group-hover:shadow-romolo-charcoal/20">
                 <Image
                   src={step.image}
                   alt={step.imageAlt}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.05]"
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                />
+                {/* Soft corner vignette */}
+                <div
+                  aria-hidden
+                  className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                  style={{
+                    background:
+                      "radial-gradient(ellipse at center, transparent 55%, rgba(26,26,26,0.18) 100%)",
+                  }}
                 />
               </div>
 
               {/* Content */}
               <div className="flex items-start gap-4">
-                <span className="font-[var(--font-serif)] text-5xl font-light text-romolo-charcoal/10 leading-none shrink-0">
+                <span className="font-[var(--font-serif)] text-6xl md:text-7xl font-light text-romolo-charcoal/15 leading-[0.8] shrink-0 tabular-nums transition-colors duration-500 group-hover:text-romolo-red/30">
                   {step.number}
                 </span>
-                <div>
-                  <h3 className="font-[var(--font-serif)] text-xl md:text-2xl font-medium text-romolo-charcoal mb-2">
+                <div className="pt-1">
+                  <h3 className="font-[var(--font-serif)] text-xl md:text-2xl font-medium text-romolo-charcoal mb-2 transition-colors duration-500 group-hover:text-romolo-red">
                     {step.title}
                   </h3>
                   <p className="text-sm text-romolo-warm-gray leading-relaxed">

@@ -25,18 +25,18 @@ export default function Heritage() {
       />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         {/* Section header */}
-        <div className="text-center mb-20 animate-on-scroll">
-          <p className="text-[11px] tracking-[0.3em] uppercase text-romolo-red font-medium mb-4">
-            Our Heritage
-          </p>
-          <h2 className="font-[var(--font-serif)] text-4xl md:text-6xl font-light text-romolo-charcoal">
+        <div className="mb-16 md:mb-24 animate-on-scroll">
+          <div className="flex items-center gap-6 mb-8">
+            <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60" />
+            <p className="text-base md:text-xl tracking-[0.3em] uppercase text-romolo-red font-medium">
+              Our Heritage
+            </p>
+          </div>
+          <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
             60 Years of
             <br />
             <span className="italic">Tradition</span>
           </h2>
-          <div className="ornament-divider mt-6">
-            <span className="text-romolo-red text-lg">&#10045;</span>
-          </div>
         </div>
 
         {/* Two-column layout */}
