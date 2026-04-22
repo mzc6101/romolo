@@ -1,7 +1,29 @@
 export default function Heritage() {
   return (
-    <section id="heritage" className="py-24 md:py-36 bg-white">
-      <div className="max-w-7xl mx-auto px-6 lg:px-10">
+    <section id="heritage" className="relative py-24 md:py-36 bg-romolo-cream overflow-hidden">
+      {/* Aged B&W photographic backdrop */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "url('https://res.cloudinary.com/dhv6sobkv/image/upload/v1775679180/Nonni_cc9rny.avif')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "grayscale(1) contrast(1.1) brightness(0.95)",
+          opacity: 0.15,
+        }}
+      />
+      {/* Vignette for depth */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(250,248,245,0) 40%, rgba(26,26,26,0.22) 100%)",
+        }}
+      />
+      <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
         {/* Section header */}
         <div className="text-center mb-20 animate-on-scroll">
           <p className="text-[11px] tracking-[0.3em] uppercase text-romolo-red font-medium mb-4">
