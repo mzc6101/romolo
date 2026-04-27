@@ -6,7 +6,6 @@ type Step = {
   description: string;
   image: string;
   imageAlt: string;
-  personable?: boolean;
 };
 
 const steps: Step[] = [
@@ -41,11 +40,10 @@ const steps: Step[] = [
     number: "04",
     title: "Yours, Filled to Order",
     description:
-      "Aaron pipes each cannolo when you order it — never before. Garnished with pistachio, candied orange, or chocolate.",
+      "We fill each cannolo when you order it, never before. Garnished with pistachio, candied orange, or chocolate.",
     image:
-      "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679842/_N8Z0606_wcehwu.jpg",
+      "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328121/_N8Z0971_afadsx.jpg",
     imageAlt: "Aaron handing a cannolo to a customer at the counter",
-    personable: true,
   },
 ];
 
@@ -98,14 +96,6 @@ export default function Process() {
                       "radial-gradient(ellipse at center, transparent 55%, rgba(26,26,26,0.18) 100%)",
                   }}
                 />
-                {step.personable && (
-                  <div
-                    className="absolute top-3 left-3 bg-romolo-red text-white text-[10px] tracking-[0.15em] uppercase font-bold px-2 py-1 rounded-sm"
-                    title="Closing visual must feel human — Aaron + customer at the counter"
-                  >
-                    New shot — w/ Aaron
-                  </div>
-                )}
               </div>
 
               {/* Content */}

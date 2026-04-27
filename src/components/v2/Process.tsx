@@ -34,7 +34,7 @@ const steps = [
     description:
       "Piped to order, garnished with crushed pistachios, candied orange peel, or dark chocolate chips. Every cannoli leaves our hands as a small work of edible art.",
     image:
-      "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679842/_N8Z0606_wcehwu.jpg",
+      "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328121/_N8Z0971_afadsx.jpg",
     imageAlt: "Finished cannoli being garnished with pistachios",
   },
 ];
