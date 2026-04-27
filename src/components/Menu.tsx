@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { MENU_DATA, fmt } from "@/lib/data";
 import { useOrder } from "./OrderProvider";
@@ -131,15 +132,27 @@ export default function Menu() {
                       style={{ background: isHov ? "var(--color-romolo-cream)" : "transparent" }}
                     >
                       <div
-                        className="shrink-0 bg-romolo-cream rounded-sm flex items-center justify-center border border-romolo-border transition-all duration-300"
+                        className={`shrink-0 bg-romolo-cream rounded-sm border border-romolo-border transition-all duration-300 relative overflow-hidden ${
+                          item.imageUrl ? "" : "flex items-center justify-center"
+                        }`}
                         style={{
                           width: isHov ? 96 : 80,
                           height: isHov ? 96 : 80,
                         }}
                       >
-                        <span className="text-[10px] text-romolo-warm-gray text-center leading-tight px-1">
-                          [ {item.name.toLowerCase()} ]
-                        </span>
+                        {item.imageUrl ? (
+                          <Image
+                            src={item.imageUrl}
+                            alt={item.name}
+                            fill
+                            className="object-cover"
+                            sizes="96px"
+                          />
+                        ) : (
+                          <span className="text-[10px] text-romolo-warm-gray text-center leading-tight px-1">
+                            [ {item.name.toLowerCase()} ]
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">
