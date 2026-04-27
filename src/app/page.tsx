@@ -8,10 +8,12 @@ import Contact from "@/components/Contact";
 import Location from "@/components/Location";
 import Footer from "@/components/Footer";
 import ScrollAnimator from "@/components/ScrollAnimator";
+import { OrderProvider } from "@/components/OrderProvider";
+import OrderFlowMount from "@/components/OrderFlowMount";
 
 export default function Home() {
   return (
-    <>
+    <OrderProvider>
       <ScrollAnimator />
       <Navbar />
       <main>
@@ -24,6 +26,7 @@ export default function Home() {
         <Location />
       </main>
       <Footer />
-    </>
+      <OrderFlowMount />
+    </OrderProvider>
   );
 }

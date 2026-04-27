@@ -31,6 +31,9 @@ export default function Contact() {
                 <div>
                   <p className="text-sm font-medium text-romolo-charcoal">Email</p>
                   <p className="text-sm text-romolo-warm-gray">hello@romolocannoli.com</p>
+                  <p className="text-[11px] italic text-romolo-warm-gray mt-0.5">
+                    (confirm w/ Joey)
+                  </p>
                 </div>
               </div>
 

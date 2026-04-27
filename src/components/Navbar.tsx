@@ -2,17 +2,19 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import { useOrder } from "./OrderProvider";
 
 const navLinks = [
   { label: "Heritage", href: "#heritage" },
   { label: "Our Process", href: "#process" },
   { label: "Menu", href: "#menu" },
-  { label: "Testimonials", href: "#testimonials" },
+  { label: "Reviews", href: "#testimonials" },
   { label: "Contact", href: "#contact" },
   { label: "Visit Us", href: "#location" },
 ];
 
 export default function Navbar() {
+  const { open: openOrder } = useOrder();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -81,12 +83,13 @@ export default function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <a
-                href="#menu"
+              <button
+                type="button"
+                onClick={openOrder}
                 className="ml-2 px-5 py-2.5 bg-romolo-red text-white text-[12px] font-bold tracking-[0.1em] uppercase rounded-sm hover:bg-romolo-red-dark transition-colors duration-300"
               >
                 Order Now
-              </a>
+              </button>
             </div>
 
             {/* Mobile hamburger */}
@@ -152,9 +155,12 @@ export default function Navbar() {
               {link.label}
             </a>
           ))}
-          <a
-            href="#menu"
-            onClick={() => setMobileOpen(false)}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              openOrder();
+            }}
             className="mt-4 px-8 py-3 bg-romolo-red text-white text-sm font-bold tracking-[0.1em] uppercase rounded-sm"
             style={{
               transitionDelay: mobileOpen ? `${navLinks.length * 60}ms` : "0ms",
@@ -163,7 +169,7 @@ export default function Navbar() {
             }}
           >
             Order Now
-          </a>
+          </button>
         </div>
       </div>
     </>

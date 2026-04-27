@@ -55,13 +55,18 @@ export default function Footer() {
               Explore
             </h5>
             <ul className="space-y-3">
-              {["Heritage", "Our Process", "Menu", "Testimonials"].map((item) => (
-                <li key={item}>
+              {[
+                { label: "Heritage", href: "#heritage" },
+                { label: "Our Process", href: "#process" },
+                { label: "Menu", href: "#menu" },
+                { label: "Reviews", href: "#testimonials" },
+              ].map((item) => (
+                <li key={item.label}>
                   <a
-                    href={`#${item.toLowerCase().replace(/\s+/g, "-").replace("our-", "")}`}
+                    href={item.href}
                     className="text-sm text-white/60 hover:text-romolo-red transition-colors"
                   >
-                    {item}
+                    {item.label}
                   </a>
                 </li>
               ))}

@@ -55,28 +55,27 @@ export default function Heritage() {
             <span className="font-[var(--font-serif)] text-8xl md:text-9xl font-light text-romolo-blue leading-none block mb-2">
               1968
             </span>
-            <h3 className="font-[var(--font-serif)] text-2xl md:text-3xl font-light text-romolo-charcoal mb-6">
-              Lorem ipsum dolor sit amet <br className="hidden md:block" />
-              consectetur adipiscing elit
+            <h3 className="font-[var(--font-serif)] text-2xl md:text-3xl font-light text-romolo-charcoal mb-6 leading-snug">
+              From a Sicilian village kitchen
+              <br className="hidden md:block" />
+              to a corner shop in San Mateo.
             </h3>
             <div className="space-y-5 text-romolo-warm-gray leading-relaxed">
               <p>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do
-                eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
-                ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-                aliquip ex ea commodo consequat.
+                Romolo learned to fold ricotta from his mother in a stone kitchen
+                outside Palermo. When he came west in &apos;68, he brought one
+                handwritten recipe and a metal cannolo tube wrapped in cloth.
               </p>
               <p>
-                Duis aute irure dolor in reprehenderit in voluptate velit esse
-                cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
-                cupidatat non proident, sunt in culpa qui officia deserunt mollit
-                anim id est laborum.
+                Sixty years later, his grandkids still fry every shell to order
+                on the same flat-top in the back. Aaron pipes ricotta the way
+                Romolo taught him — from a fold in a square of parchment, never
+                from a bag.
               </p>
               <p>
-                Sed ut perspiciatis unde omnis iste natus error sit voluptatem
-                accusantium doloremque laudantium, totam rem aperiam, eaque ipsa
-                quae ab illo inventore veritatis et quasi architecto beatae vitae
-                dicta sunt explicabo.
+                We don&apos;t make cannoli ahead. We don&apos;t make them in
+                batches. We make them when you order them, and we make them the
+                same way we always have.
               </p>
             </div>
 
