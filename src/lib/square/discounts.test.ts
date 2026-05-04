@@ -140,17 +140,38 @@ describe("computeDiscounts", () => {
     expect(result.totalCents).toBe(0);
   });
 
-  it("evaluates each cart line independently (mixed-quantity lines)", () => {
+  it("aggregates qty across lines (4 + 2 = 6 qualifies the 6-11 tier)", () => {
+    // Mirrors the Sandbox order: two lines of Full Single with different
+    // modifiers, qty 4 and 2. Aggregate is 6 → 6-11 rule fires; the $0.50
+    // per-unit discount is distributed back to each line by qty.
     const lines: DiscountLine[] = [
-      // 5 Full Singles → no discount
+      { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 4, subtotalCents: 2800 },
+      { lineKey: "L2", catalogObjectId: FULL_SINGLE, quantity: 2, subtotalCents: 1400 },
+    ];
+    const result = computeDiscounts(lines, snapshot);
+    expect(result.discountCents).toBe(300);
+    expect(result.totalCents).toBe(3900);
+    const byLine = Object.fromEntries(
+      result.applied.map((a) => [a.lineKey, a.amountCents])
+    );
+    expect(byLine).toEqual({ L1: 200, L2: 100 });
+  });
+
+  it("aggregate qty escalates the tier when split across lines (5 + 12 = 17 hits 12+)", () => {
+    const lines: DiscountLine[] = [
       { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 5, subtotalCents: 3500 },
-      // 12 Full Singles on a separate line → 12+ tier
       { lineKey: "L2", catalogObjectId: FULL_SINGLE, quantity: 12, subtotalCents: 8400 },
     ];
     const result = computeDiscounts(lines, snapshot);
-    expect(result.discountCents).toBe(1200);
-    expect(result.applied).toHaveLength(1);
-    expect(result.applied[0].lineKey).toBe("L2");
+    // Both lines now qualify (aggregate 17 ≥ 12), $1.00/unit applied per line.
+    expect(result.discountCents).toBe(1700);
+    const byLine = Object.fromEntries(
+      result.applied.map((a) => [a.lineKey, a.amountCents])
+    );
+    expect(byLine).toEqual({ L1: 500, L2: 1200 });
+    expect(new Set(result.applied.map((a) => a.name))).toEqual(
+      new Set(["Full Size 12+"])
+    );
   });
 
   it("ignores lines that don't match any rule's product set", () => {

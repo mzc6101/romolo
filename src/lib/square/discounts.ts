@@ -32,33 +32,29 @@ export type DiscountResult = {
   applied: AppliedDiscount[];
 };
 
-function matchesProductSet(
+// Membership-only check (no quantity filter). The quantity threshold applies
+// to the aggregate qty across all matching lines, not any single line.
+function isProductInSet(
   set: SnapshotProductSet,
-  line: DiscountLine
+  catalogObjectId: string
 ): boolean {
-  if (set.quantityMin != null && line.quantity < set.quantityMin) return false;
-  if (set.quantityMax != null && line.quantity > set.quantityMax) return false;
-  if (set.quantityExact != null && line.quantity !== set.quantityExact) return false;
-
   if (set.allProducts) return true;
-  if (
-    set.productIdsAny &&
-    set.productIdsAny.length > 0 &&
-    !set.productIdsAny.includes(line.catalogObjectId)
-  ) {
-    return false;
+  if (set.productIdsAny && set.productIdsAny.length > 0) {
+    return set.productIdsAny.includes(catalogObjectId);
   }
-  // product_ids_all on a CatalogProductSet means "every listed product must be
-  // present in the cart" — but for per-line evaluation it's typically used
-  // alongside product_ids_any. We treat product_ids_all conservatively as a
-  // membership check for the single line we're evaluating.
-  if (
-    set.productIdsAll &&
-    set.productIdsAll.length > 0 &&
-    !set.productIdsAll.includes(line.catalogObjectId)
-  ) {
-    return false;
+  if (set.productIdsAll && set.productIdsAll.length > 0) {
+    return set.productIdsAll.includes(catalogObjectId);
   }
+  return false;
+}
+
+function aggregateQtyMeetsThreshold(
+  set: SnapshotProductSet,
+  aggregateQty: number
+): boolean {
+  if (set.quantityMin != null && aggregateQty < set.quantityMin) return false;
+  if (set.quantityMax != null && aggregateQty > set.quantityMax) return false;
+  if (set.quantityExact != null && aggregateQty !== set.quantityExact) return false;
   return true;
 }
 
@@ -97,32 +93,60 @@ export function computeDiscounts(
   const applied: AppliedDiscount[] = [];
   let total = 0;
 
-  // Per-line: pick the single matching AUTOMATIC rule that yields the largest
+  // Step 1: evaluate each AUTOMATIC line-item rule against the AGGREGATE
+  // quantity across all cart lines whose variation is in the rule's product
+  // set. Square's pricing-rule evaluation is cart-aggregate, not per-line —
+  // e.g. 4 cannolis on one line + 2 on another satisfies a quantity_min:6
+  // rule, then the per-unit discount is distributed back to each line.
+  type FiredRule = {
+    rule: SnapshotPricingRule;
+    discount: SnapshotDiscount;
+    matchedLineKeys: Set<string>;
+  };
+  const fired: FiredRule[] = [];
+  for (const rule of snapshot.pricingRules) {
+    if (rule.applicationMode !== "AUTOMATIC") continue;
+    if (rule.discountTargetScope !== "LINE_ITEM") continue;
+    if (!rule.matchProductsId) continue;
+    const set = productSetById.get(rule.matchProductsId);
+    if (!set) continue;
+    const discount = discountById.get(rule.discountId);
+    if (!discount) continue;
+    const excludeSet = rule.excludeProductsId
+      ? productSetById.get(rule.excludeProductsId)
+      : undefined;
+
+    const matchedLines = lines.filter((l) => {
+      if (!isProductInSet(set, l.catalogObjectId)) return false;
+      if (excludeSet && isProductInSet(excludeSet, l.catalogObjectId)) return false;
+      return true;
+    });
+    if (matchedLines.length === 0) continue;
+    const aggregateQty = matchedLines.reduce((s, l) => s + l.quantity, 0);
+    if (!aggregateQtyMeetsThreshold(set, aggregateQty)) continue;
+
+    fired.push({
+      rule,
+      discount,
+      matchedLineKeys: new Set(matchedLines.map((l) => l.lineKey)),
+    });
+  }
+
+  // Step 2: per-line pick the fired rule that yields the largest line
   // savings. Square applies the most-favorable tier rather than stacking
-  // overlapping pricing rules, so a 12-pack of cannolis only gets the 12+
-  // discount even when the 6-11 rule's product_set also matches.
+  // overlapping rules, so at aggregate qty 12+ the $1.00/unit tier wins
+  // over the $0.50/unit tier even though both match the product_set.
   for (const line of lines) {
     let bestForLine: AppliedDiscount | null = null;
-    for (const rule of snapshot.pricingRules) {
-      if (rule.applicationMode !== "AUTOMATIC") continue;
-      if (rule.discountTargetScope !== "LINE_ITEM") continue;
-      if (!rule.matchProductsId) continue;
-      const set = productSetById.get(rule.matchProductsId);
-      if (!set) continue;
-      if (!matchesProductSet(set, line)) continue;
-      const excludeSet = rule.excludeProductsId
-        ? productSetById.get(rule.excludeProductsId)
-        : undefined;
-      if (excludeSet && matchesProductSet(excludeSet, line)) continue;
-      const discount = discountById.get(rule.discountId);
-      if (!discount) continue;
-      const amount = lineDiscountAmount(discount, line);
+    for (const f of fired) {
+      if (!f.matchedLineKeys.has(line.lineKey)) continue;
+      const amount = lineDiscountAmount(f.discount, line);
       if (amount <= 0) continue;
       if (!bestForLine || amount > bestForLine.amountCents) {
         bestForLine = {
-          ruleId: rule.id,
-          discountId: discount.id,
-          name: discount.name,
+          ruleId: f.rule.id,
+          discountId: f.discount.id,
+          name: f.discount.name,
           amountCents: amount,
           scope: "LINE_ITEM",
           lineKey: line.lineKey,
