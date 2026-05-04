@@ -1,34 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  DELIVERY_ZONES,
-  MENU_DATA,
-  fmt,
-  type DeliveryZone,
-  type Flavor,
-} from "@/lib/data";
-import { useOrder } from "./OrderProvider";
+// NOTE: This file previously contained Cannoli-specific UI (flavor mix, kit shells,
+// "you decide", delivery zones, Sunday surcharge). That code has been removed in
+// favor of generic Square-driven rendering. When wiring Cannoli back in, restore
+// those flows from git history (commit predating Square integration) — they will
+// need to be re-shaped against snapshot.modifierLists for "Cannoli Filling",
+// "Cannoli Toppings", etc.
 
-type Address = { street: string; apt: string; city: string; zip: string };
+import { useEffect, useMemo, useState } from "react";
+import { useOrder } from "./OrderProvider";
+import { VariationPicker } from "./order/VariationPicker";
+import { ModifierSet } from "./order/ModifierSet";
+import type { MenuSnapshot } from "@/lib/square/types";
+
 type Contact = { name: string; phone: string; email: string };
-type FlavorMix = Record<string, number> & { __mixItUp?: number };
+
 type OrderLine = {
   id: string;
-  itemId: string;
+  itemId: string;       // SnapshotItem.id
+  variationId: string;  // SnapshotVariation.id
   qty: number;
-  shell: string;
-  flavorMix: FlavorMix;
+  modifiers: Record<string, string[]>; // modifierListId -> selected modifier ids
 };
+
 type Order = {
   date: string;
   time: string;
   timeAvailable: boolean;
   lines: OrderLine[];
-  fulfillment: "pickup" | "delivery" | null;
-  zone: DeliveryZone | null;
-  address: Address;
-  deliveryNotes: string;
+  fulfillment: "pickup";
   contact: Contact;
   cardOk: boolean;
   confirmation: string;
@@ -40,31 +40,32 @@ const initialOrder = (): Order => ({
   date: "",
   time: "",
   timeAvailable: true,
-  lines: [
-    { id: lineId(), itemId: "cannoli-mini", qty: 12, shell: "plain", flavorMix: { original: 12 } },
-  ],
-  fulfillment: null,
-  zone: null,
-  address: { street: "", apt: "", city: "", zip: "" },
-  deliveryNotes: "",
+  lines: [],
+  fulfillment: "pickup",
   contact: { name: "", phone: "", email: "" },
   cardOk: false,
-  confirmation: "RC-" + Math.random().toString(36).slice(2, 8).toUpperCase(),
+  confirmation: "",
 });
 
-const flavorsAssigned = (line: OrderLine) => {
-  const mix = line.flavorMix || {};
-  if (mix.__mixItUp) return true;
-  const total = Object.entries(mix)
-    .filter(([k]) => k !== "__mixItUp")
-    .reduce((a, [, b]) => a + (b as number), 0);
-  return total === line.qty;
+const fmtCents = (c: number) => "$" + (c / 100).toFixed(2);
+
+const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
+  const item = snapshot.items.find((i) => i.id === line.itemId);
+  if (!item) return false;
+  const variation = item.variations.find((v) => v.id === line.variationId);
+  if (!variation || !variation.inStock) return false;
+  for (const ml of item.modifierLists) {
+    const sel = line.modifiers[ml.id] ?? [];
+    if (sel.length < ml.minSelected) return false;
+    if (ml.maxSelected != null && sel.length > ml.maxSelected) return false;
+  }
+  return line.qty > 0;
 };
 
 const STEP_LABELS = ["When", "What", "How", "Pay"] as const;
 
-export default function OrderFlow({ flavors }: { flavors: Flavor[] }) {
-  const { isOpen, close } = useOrder();
+export default function OrderFlow() {
+  const { isOpen, close, snapshot } = useOrder();
   const [step, setStep] = useState(0);
   const [order, setOrder] = useState<Order>(initialOrder);
 
@@ -83,14 +84,12 @@ export default function OrderFlow({ flavors }: { flavors: Flavor[] }) {
   const canAdvance = (() => {
     if (step === 0) return !!order.date && !!order.time && order.timeAvailable;
     if (step === 1)
-      return order.lines.length > 0 && order.lines.every((l) => l.qty > 0 && flavorsAssigned(l));
-    if (step === 2) {
-      if (order.fulfillment === "pickup") return true;
-      if (order.fulfillment === "delivery")
-        return !!order.zone && order.zone.auto && !!order.address.street;
-      return false;
-    }
-    if (step === 3) return order.cardOk;
+      return (
+        order.lines.length > 0 &&
+        order.lines.every((l) => lineValid(l, snapshot))
+      );
+    if (step === 2) return order.fulfillment === "pickup";
+    if (step === 3) return order.cardOk && !!order.contact.email && !!order.contact.name;
     return false;
   })();
 
@@ -137,8 +136,8 @@ export default function OrderFlow({ flavors }: { flavors: Flavor[] }) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-7 sm:py-7">
           {step === 0 && <StepWhen order={order} setOrder={setOrder} />}
-          {step === 1 && <StepWhat order={order} setOrder={setOrder} flavors={flavors} />}
-          {step === 2 && <StepHow order={order} setOrder={setOrder} />}
+          {step === 1 && <StepWhat order={order} setOrder={setOrder} />}
+          {step === 2 && <StepHow order={order} />}
           {step === 3 && <StepPay order={order} setOrder={setOrder} />}
           {step === 4 && <StepDone order={order} onClose={close} />}
         </div>
@@ -146,7 +145,7 @@ export default function OrderFlow({ flavors }: { flavors: Flavor[] }) {
         {/* Footer */}
         {step < 4 && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 sm:px-6 border-t border-romolo-border bg-romolo-cream">
-            <OrderSummary order={order} />
+            <OrderSummary order={order} snapshot={snapshot} />
             <div className="flex gap-2.5">
               {step > 0 && (
                 <button
@@ -390,37 +389,63 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
 function StepWhat({
   order,
   setOrder,
-  flavors,
 }: {
   order: Order;
   setOrder: (o: Order) => void;
-  flavors: Flavor[];
 }) {
+  const { snapshot } = useOrder();
+
   const updateLine = (id: string, patch: Partial<OrderLine>) =>
-    setOrder({ ...order, lines: order.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) });
+    setOrder({
+      ...order,
+      lines: order.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    });
   const removeLine = (id: string) =>
     setOrder({ ...order, lines: order.lines.filter((l) => l.id !== id) });
-  const addLine = () =>
+
+  const addLine = () => {
+    const firstItem = snapshot.items[0];
+    if (!firstItem) return;
+    const firstVariation = firstItem.variations.find((v) => v.inStock) ?? firstItem.variations[0];
+    const seedModifiers: Record<string, string[]> = {};
+    for (const ml of firstItem.modifierLists) {
+      if (ml.selectionType === "SINGLE" && ml.modifiers[0]) {
+        seedModifiers[ml.id] = [ml.modifiers[0].id];
+      } else {
+        seedModifiers[ml.id] = [];
+      }
+    }
     setOrder({
       ...order,
       lines: [
         ...order.lines,
-        { id: lineId(), itemId: "cannoli-full", qty: 6, shell: "plain", flavorMix: { original: 6 } },
+        {
+          id: lineId(),
+          itemId: firstItem.id,
+          variationId: firstVariation?.id ?? "",
+          qty: 1,
+          modifiers: seedModifiers,
+        },
       ],
     });
+  };
+
+  // Auto-add a first line when modal opens with empty cart
+  if (order.lines.length === 0 && snapshot.items.length > 0) {
+    setTimeout(addLine, 0);
+  }
 
   return (
     <div>
       <StepHeader
         title="What do you want?"
-        subtitle="Mix flavors across an order — six original, two strawberry, two chocolate. Or hit 'You decide' and let us pick."
+        subtitle="Pick items, sizes, and any options. Add as many as you'd like."
       />
       <div className="flex flex-col gap-4">
         {order.lines.map((line, idx) => (
           <OrderLineEditor
             key={line.id}
             line={line}
-            flavors={flavors}
             onChange={(patch) => updateLine(line.id, patch)}
             onRemove={order.lines.length > 1 ? () => removeLine(line.id) : null}
             index={idx}
@@ -439,58 +464,38 @@ function StepWhat({
 
 function OrderLineEditor({
   line,
-  flavors,
   onChange,
   onRemove,
   index,
 }: {
   line: OrderLine;
-  flavors: Flavor[];
   onChange: (patch: Partial<OrderLine>) => void;
   onRemove: (() => void) | null;
   index: number;
 }) {
-  const item = MENU_DATA.flatMap((c) => c.items).find((i) => i.id === line.itemId);
-  const isCannoli = line.itemId.startsWith("cannoli-") && line.itemId !== "cannoli-kit";
-  const stepSize = line.itemId === "cannoli-kit" ? 6 : 1;
-  const minQty = stepSize;
-  const totalAssigned = Object.entries(line.flavorMix || {})
-    .filter(([k]) => k !== "__mixItUp")
-    .reduce((a, [, b]) => a + (b as number), 0);
-  const remaining = line.qty - totalAssigned;
-  const availableFlavors = flavors.filter((f) => f.available);
-  const mixIt = !!line.flavorMix?.__mixItUp;
+  const { snapshot } = useOrder();
+  const item = snapshot.items.find((i) => i.id === line.itemId);
+  if (!item) return null;
 
-  const setQty = (q: number) => {
-    const clamped = Math.max(minQty, Math.round(q / stepSize) * stepSize);
-    let mix: FlavorMix = { ...(line.flavorMix || {}) };
-    if (mix.__mixItUp) {
-      mix = { __mixItUp: clamped };
-    } else {
-      let assigned = Object.entries(mix)
-        .filter(([k]) => k !== "__mixItUp")
-        .reduce((a, [, v]) => a + (v as number), 0);
-      while (assigned > clamped) {
-        const k = Object.keys(mix)
-          .filter((k) => k !== "__mixItUp" && (mix[k] as number) > 0)
-          .pop();
-        if (!k) break;
-        mix[k] = (mix[k] as number) - 1;
-        assigned -= 1;
+  const onItemChange = (id: string) => {
+    const next = snapshot.items.find((i) => i.id === id);
+    if (!next) return;
+    const firstVariation = next.variations.find((v) => v.inStock) ?? next.variations[0];
+    const seedModifiers: Record<string, string[]> = {};
+    for (const ml of next.modifierLists) {
+      if (ml.selectionType === "SINGLE" && ml.modifiers[0]) {
+        seedModifiers[ml.id] = [ml.modifiers[0].id];
+      } else {
+        seedModifiers[ml.id] = [];
       }
     }
-    onChange({ qty: clamped, flavorMix: mix });
+    onChange({
+      itemId: id,
+      variationId: firstVariation?.id ?? "",
+      qty: 1,
+      modifiers: seedModifiers,
+    });
   };
-
-  const setFlavorCount = (id: string, n: number) => {
-    const next: FlavorMix = { ...(line.flavorMix || {}) };
-    delete next.__mixItUp;
-    next[id] = Math.max(0, n);
-    if (next[id] === 0) delete next[id];
-    onChange({ flavorMix: next });
-  };
-
-  const enableMix = () => onChange({ flavorMix: { __mixItUp: line.qty } });
 
   return (
     <div className="border border-romolo-border rounded-sm p-4 bg-white">
@@ -501,31 +506,24 @@ function OrderLineEditor({
           </div>
           <select
             value={line.itemId}
-            onChange={(e) => {
-              const id = e.target.value;
-              const newStep = id === "cannoli-kit" ? 6 : 1;
-              onChange({
-                itemId: id,
-                qty: newStep,
-                flavorMix: id.startsWith("cannoli") ? { original: newStep } : {},
-              });
-            }}
+            onChange={(e) => onItemChange(e.target.value)}
             className="w-full max-w-[360px] px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal focus:outline-none focus:border-romolo-red/40 appearance-none"
           >
-            {MENU_DATA.map((c) => (
-              <optgroup key={c.category} label={c.category}>
-                {c.items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} — {fmt(i.price)}
-                  </option>
-                ))}
-              </optgroup>
+            {snapshot.items.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name}
+              </option>
             ))}
           </select>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <QtyStepper qty={line.qty} step={stepSize} min={minQty} onChange={setQty} />
+          <QtyStepper
+            qty={line.qty}
+            step={1}
+            min={1}
+            onChange={(v) => onChange({ qty: v })}
+          />
           {onRemove && (
             <button
               onClick={onRemove}
@@ -538,114 +536,28 @@ function OrderLineEditor({
         </div>
       </div>
 
-      {item && (
-        <div className="text-[13px] text-romolo-warm-gray mb-3">
-          {item.description} {line.itemId === "cannoli-kit" && "· sold in 6's"}
-        </div>
+      {item.description && (
+        <div className="text-[13px] text-romolo-warm-gray mb-3">{item.description}</div>
       )}
 
-      {(line.itemId === "cannoli-full" || line.itemId === "cannoli-mini") && (
-        <div className="mb-4">
-          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-            Shell
-          </h5>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: "plain", label: "Plain" },
-              { id: "chocolate-dipped", label: "Chocolate-dipped (+$0.50)" },
-              { id: "pistachio-dusted", label: "Pistachio-dusted (+$0.50)" },
-            ].map((s) => {
-              const sel = line.shell === s.id;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => onChange({ shell: s.id })}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    sel
-                      ? "bg-romolo-charcoal text-white border-romolo-charcoal"
-                      : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {item.variations.length > 1 && (
+        <VariationPicker
+          variations={item.variations}
+          selectedId={line.variationId}
+          onSelect={(id) => onChange({ variationId: id })}
+        />
       )}
 
-      {(isCannoli || line.itemId === "cannoli-kit") && (
-        <div>
-          <div className="flex items-center justify-between mb-2.5">
-            <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium m-0">
-              Filling{" "}
-              <span
-                className="font-semibold normal-case tracking-normal"
-                style={{
-                  color: mixIt
-                    ? "var(--color-romolo-red)"
-                    : remaining === 0
-                    ? "#2da66f"
-                    : "var(--color-romolo-red)",
-                }}
-              >
-                · {mixIt ? "you decide" : remaining === 0 ? "all assigned ✓" : `${remaining} of ${line.qty} left to assign`}
-              </span>
-            </h5>
-            <button
-              onClick={enableMix}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-[0.1em] uppercase border border-romolo-red transition-colors ${
-                mixIt ? "bg-romolo-red text-white" : "bg-transparent text-romolo-red"
-              }`}
-              title="Default to whatever the team is making today"
-            >
-              {mixIt ? "✓ You decide" : "Mix it up — you decide"}
-            </button>
-          </div>
-
-          {!mixIt && (
-            <div
-              className="grid gap-2"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}
-            >
-              {availableFlavors.map((f) => {
-                const n = (line.flavorMix && (line.flavorMix[f.id] as number)) || 0;
-                return (
-                  <div
-                    key={f.id}
-                    className={`flex items-center justify-between gap-2.5 px-3 py-2 border border-romolo-border rounded-sm ${
-                      n > 0 ? "bg-romolo-cream" : "bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0"
-                        style={{ background: f.color }}
-                      />
-                      <span className="text-[13px] truncate">{f.name}</span>
-                    </div>
-                    <QtyStepper
-                      qty={n}
-                      step={1}
-                      min={0}
-                      max={remaining + n}
-                      onChange={(v) => setFlavorCount(f.id, v)}
-                      compact
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {mixIt && (
-            <div className="p-3.5 bg-romolo-cream border border-dashed border-romolo-border rounded-sm text-[13px] text-romolo-warm-gray italic">
-              We&apos;ll fill all {line.qty} with whatever the team picks for the day —
-              usually a mix of original ricotta and one rotating flavor. Surprise edition.
-            </div>
-          )}
-        </div>
-      )}
+      {item.modifierLists.map((ml) => (
+        <ModifierSet
+          key={ml.id}
+          list={ml}
+          selectedIds={line.modifiers[ml.id] ?? []}
+          onChange={(ids) =>
+            onChange({ modifiers: { ...line.modifiers, [ml.id]: ids } })
+          }
+        />
+      ))}
     </div>
   );
 }
@@ -699,213 +611,23 @@ function QtyStepper({
   );
 }
 
-// ─────────── Step 3: How ───────────
-function StepHow({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
+// ─────────── Step 3: How (stub — Task 13 will replace) ───────────
+function StepHow({ order }: { order: Order }) {
   return (
     <div>
       <StepHeader
         title="How do you want it?"
-        subtitle="Pickup is always free. Delivery is auto-priced by distance from the shop."
+        subtitle="Pickup at the shop. Walk in, give your name, the cannoli are filled while you watch."
       />
-
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <FulfillmentCard
-          icon="🛍️"
-          label="Pickup"
-          sub="81 W. 37th Ave, San Mateo"
-          selected={order.fulfillment === "pickup"}
-          onSelect={() => setOrder({ ...order, fulfillment: "pickup", zone: null })}
-        />
-        <FulfillmentCard
-          icon="🚚"
-          label="Delivery"
-          sub="3 zones · long-distance by phone"
-          selected={order.fulfillment === "delivery"}
-          onSelect={() => setOrder({ ...order, fulfillment: "delivery" })}
-        />
-      </div>
-
-      {order.fulfillment === "pickup" && (
-        <div className="p-4 bg-romolo-cream border border-romolo-border rounded-sm">
-          <div className="font-[var(--font-serif)] text-lg font-medium mb-1.5">
-            81 W. 37th Ave, San Mateo CA 94403
-          </div>
-          <div className="text-[13px] text-romolo-warm-gray leading-relaxed">
-            Look for the red awning. Walk in, give your name, the cannoli are filled while you watch. Free street parking out front.
-          </div>
+      <div className="p-4 bg-romolo-cream border border-romolo-border rounded-sm">
+        <div className="font-[var(--font-serif)] text-lg font-medium mb-1.5">
+          81 W. 37th Ave, San Mateo CA 94403
         </div>
-      )}
-
-      {order.fulfillment === "delivery" && <DeliveryConfig order={order} setOrder={setOrder} />}
-    </div>
-  );
-}
-
-function FulfillmentCard({
-  icon,
-  label,
-  sub,
-  selected,
-  onSelect,
-}: {
-  icon: string;
-  label: string;
-  sub: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      className={`text-left p-4 rounded-sm border transition-all ${
-        selected
-          ? "bg-romolo-charcoal text-white border-romolo-charcoal"
-          : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-charcoal"
-      }`}
-    >
-      <div className="text-[28px] mb-2">{icon}</div>
-      <div className="font-[var(--font-serif)] text-[22px] font-medium">{label}</div>
-      <div className="text-xs opacity-70 mt-0.5">{sub}</div>
-    </button>
-  );
-}
-
-function DeliveryConfig({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
-  const isSunday =
-    !!order.date && new Date(order.date + "T00:00:00").getDay() === 0;
-
-  return (
-    <div>
-      <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium">
-        Delivery zone
-      </h5>
-      <p className="text-xs text-romolo-warm-gray mb-3 italic mt-1">
-        Auto-priced by distance from San Mateo. Long-distance orders (Santa Cruz, Napa, weddings 2+ hrs out) need a phone call so we can plan it together.
-      </p>
-      <div className="flex flex-col gap-2 mb-5">
-        {DELIVERY_ZONES.map((z) => {
-          const sel = order.zone?.id === z.id;
-          return (
-            <button
-              key={z.id}
-              onClick={() => setOrder({ ...order, zone: z })}
-              className={`flex items-center justify-between gap-3.5 px-4 py-3.5 rounded-sm border text-left transition-colors ${
-                sel ? "bg-romolo-cream border-romolo-red" : "bg-white border-romolo-border hover:border-romolo-red/40"
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span
-                  className={`w-4 h-4 shrink-0 rounded-full border flex items-center justify-center ${
-                    sel ? "border-romolo-red" : "border-romolo-border"
-                  }`}
-                >
-                  {sel && <span className="w-2 h-2 bg-romolo-red rounded-full" />}
-                </span>
-                <div>
-                  <div className="font-semibold text-sm">{z.label}</div>
-                  <div className="text-xs text-romolo-warm-gray">
-                    {z.radius} · {z.eta}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                {z.auto && z.fee != null ? (
-                  <div className="font-[var(--font-serif)] text-lg font-semibold text-romolo-red">
-                    {fmt(z.fee)}
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-romolo-warm-gray font-bold tracking-[0.1em] uppercase">
-                    Call us
-                  </div>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {order.zone && !order.zone.auto && (
-        <div
-          className="p-4 mb-4 rounded-sm border"
-          style={{
-            background: "rgba(236, 56, 40, 0.06)",
-            borderColor: "rgba(236, 56, 40, 0.25)",
-          }}
-        >
-          <div className="font-[var(--font-serif)] text-[22px] font-medium text-romolo-red mb-1.5">
-            Let&apos;s plan this one together.
-          </div>
-          <p className="text-sm text-romolo-charcoal leading-relaxed mb-3.5">
-            Long-distance orders (weddings, corporate events 2+ hours out) are usually $500–$1,000 and we coordinate them by phone so timing, quantity, and route are right.
-          </p>
-          <a
-            href="tel:+16505740625"
-            className="inline-block px-5 py-3 text-[12px] font-bold tracking-[0.15em] uppercase bg-romolo-red text-white hover:bg-romolo-red-dark transition-colors rounded-sm"
-          >
-            Call (650) 574-0625
-          </a>
+        <div className="text-[13px] text-romolo-warm-gray leading-relaxed">
+          {order.date && order.time
+            ? `Pickup ${order.date} at ${order.time}.`
+            : "Pickup time confirmed in Step 1."}
         </div>
-      )}
-
-      {order.zone && order.zone.auto && (
-        <>
-          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-            Delivery address
-          </h5>
-          <div className="grid gap-2.5 mb-2.5" style={{ gridTemplateColumns: "2fr 1fr" }}>
-            <input
-              className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-              placeholder="Street address"
-              value={order.address.street}
-              onChange={(e) => setOrder({ ...order, address: { ...order.address, street: e.target.value } })}
-            />
-            <input
-              className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-              placeholder="Apt / suite"
-              value={order.address.apt}
-              onChange={(e) => setOrder({ ...order, address: { ...order.address, apt: e.target.value } })}
-            />
-          </div>
-          <div className="grid gap-2.5 mb-3.5" style={{ gridTemplateColumns: "2fr 1fr" }}>
-            <input
-              className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-              placeholder="City"
-              value={order.address.city}
-              onChange={(e) => setOrder({ ...order, address: { ...order.address, city: e.target.value } })}
-            />
-            <input
-              className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-              placeholder="ZIP"
-              value={order.address.zip}
-              onChange={(e) => setOrder({ ...order, address: { ...order.address, zip: e.target.value } })}
-            />
-          </div>
-          <textarea
-            className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40 resize-y min-h-[110px]"
-            placeholder="Delivery notes — gate code, drop-off spot, etc."
-            value={order.deliveryNotes}
-            onChange={(e) => setOrder({ ...order, deliveryNotes: e.target.value })}
-          />
-          {isSunday && (
-            <div
-              className="mt-3.5 px-3.5 py-2.5 rounded-sm border text-[13px]"
-              style={{
-                background: "#fff8ed",
-                borderColor: "#f0d8a8",
-                color: "#8a5a18",
-              }}
-            >
-              <strong>Sunday delivery</strong> — $5 surcharge added at checkout.
-            </div>
-          )}
-        </>
-      )}
-
-      <div className="mt-4 pt-3.5 border-t border-romolo-border text-[13px] text-romolo-warm-gray">
-        Edge case? Call the shop:{" "}
-        <a href="tel:+16505740625" className="text-romolo-red underline font-semibold">
-          (650) 574-0625
-        </a>
       </div>
     </div>
   );
@@ -1007,12 +729,11 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
       <p className="text-romolo-warm-gray mb-5">
         Order{" "}
         <strong className="text-romolo-charcoal">{order.confirmation}</strong> is in. We&apos;ll text{" "}
-        {order.contact.phone || "you"} when{" "}
-        {order.fulfillment === "pickup" ? "it's ready to pick up" : "the driver is on the way"}.
+        {order.contact.phone || "you"} when it&apos;s ready to pick up.
       </p>
       <div className="bg-romolo-cream border border-romolo-border rounded-sm p-4 text-left mb-5">
         <div className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
-          {order.fulfillment === "pickup" ? "Pickup" : "Delivery"}
+          Pickup
         </div>
         <div className="font-semibold">
           {prettyDate(order.date)} · {order.time}
@@ -1028,30 +749,28 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
   );
 }
 
-function OrderSummary({ order }: { order: Order }) {
-  const subtotal = order.lines.reduce((sum, l) => {
-    const item = MENU_DATA.flatMap((c) => c.items).find((i) => i.id === l.itemId);
-    return sum + (item ? item.price * l.qty : 0);
+function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapshot }) {
+  const subtotalCents = order.lines.reduce((sum, l) => {
+    const item = snapshot.items.find((i) => i.id === l.itemId);
+    if (!item) return sum;
+    const variation = item.variations.find((v) => v.id === l.variationId);
+    if (!variation) return sum;
+    let lineCents = variation.priceCents;
+    for (const ml of item.modifierLists) {
+      const selected = l.modifiers[ml.id] ?? [];
+      for (const modId of selected) {
+        const mod = ml.modifiers.find((m) => m.id === modId);
+        if (mod) lineCents += mod.priceCents;
+      }
+    }
+    return sum + lineCents * l.qty;
   }, 0);
-  const deliveryFee =
-    order.fulfillment === "delivery" && order.zone?.auto && order.zone.fee != null
-      ? order.zone.fee
-      : 0;
-  const isSunday = !!order.date && new Date(order.date + "T00:00:00").getDay() === 0;
-  const sundaySurcharge = order.fulfillment === "delivery" && isSunday ? 5 : 0;
-  const total = subtotal + deliveryFee + sundaySurcharge;
-  const extras = deliveryFee + sundaySurcharge;
 
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
       <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>
       <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal">
-        {fmt(total)}
-        {extras > 0 && (
-          <span className="text-xs font-normal text-romolo-warm-gray ml-1.5">
-            (incl. {fmt(extras)} delivery)
-          </span>
-        )}
+        {fmtCents(subtotalCents)}
       </div>
     </div>
   );
