@@ -47,4 +47,33 @@ describe("buildOrderPayload", () => {
       quantity: "2",
     });
   });
+
+  it("attaches a note when one is provided", () => {
+    const payload = buildOrderPayload(
+      {
+        ...baseRequest,
+        lines: [
+          {
+            catalogObjectId: "VAR_X",
+            quantity: 1,
+            modifiers: [],
+            note: "  No nuts please.  ",
+          },
+        ],
+      },
+      "LOC_TEST"
+    );
+    expect((payload.order.lineItems![0] as any).note).toBe("No nuts please.");
+  });
+
+  it("omits an empty/whitespace note", () => {
+    const payload = buildOrderPayload(
+      {
+        ...baseRequest,
+        lines: [{ catalogObjectId: "VAR_X", quantity: 1, modifiers: [], note: "   " }],
+      },
+      "LOC_TEST"
+    );
+    expect((payload.order.lineItems![0] as any).note).toBeUndefined();
+  });
 });

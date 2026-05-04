@@ -6,6 +6,8 @@ const lineSchema = z.object({
   catalogObjectId: z.string().min(1),
   quantity: z.number().int().min(1).max(99),
   modifiers: z.array(z.string()),
+  // Square line-item notes cap at 2000 chars; we cap a bit lower for safety.
+  note: z.string().max(500).optional(),
 });
 
 const bodySchema = z.object({

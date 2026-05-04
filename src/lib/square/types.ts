@@ -26,10 +26,16 @@ export type SnapshotVariation = {
 export type SnapshotModifierList = {
   id: string;
   name: string;
+  // "list" = pick from a fixed set of modifiers; "text" = free-text input
+  // (Square modifier_type=TEXT — no `modifiers`, used for notes/instructions).
+  modifierType: "list" | "text";
   selectionType: "SINGLE" | "MULTIPLE";
   minSelected: number;
   maxSelected: number | null;
   modifiers: SnapshotModifier[];
+  // Only set when modifierType === "text"
+  maxLength?: number;
+  textRequired?: boolean;
 };
 
 export type SnapshotModifier = {
@@ -59,5 +65,8 @@ export type OrderRequest = {
     catalogObjectId: string;
     quantity: number;
     modifiers: string[];
+    // Free-text customer note for the line (e.g. from a TEXT modifier list).
+    // Surfaces in Square dashboard under the line item.
+    note?: string;
   }>;
 };

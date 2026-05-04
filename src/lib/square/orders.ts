@@ -11,6 +11,9 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
     if (l.modifiers.length > 0) {
       item.modifiers = l.modifiers.map((m) => ({ catalogObjectId: m }));
     }
+    if (l.note && l.note.trim().length > 0) {
+      item.note = l.note.trim();
+    }
     return item;
   });
 

@@ -8,16 +8,52 @@ export function ModifierSet({
   list,
   selectedIds,
   onChange,
+  text,
+  onTextChange,
 }: {
   list: SnapshotModifierList;
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  text?: string;
+  onTextChange?: (value: string) => void;
 }) {
+  if (list.modifierType === "text") {
+    const required = list.minSelected > 0;
+    return (
+      <div className="mb-4">
+        <h5 className="flex items-center gap-2 text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+          {list.name}
+          <span className="font-semibold normal-case tracking-normal text-romolo-red">
+            · {required ? "Required" : "Optional"}
+          </span>
+        </h5>
+        <textarea
+          value={text ?? ""}
+          onChange={(e) => onTextChange?.(e.target.value)}
+          maxLength={list.maxLength}
+          rows={3}
+          className="w-full px-3 py-2 bg-white border border-romolo-border rounded-sm text-sm text-romolo-charcoal focus:outline-none focus:border-romolo-red/40 resize-none"
+          placeholder="Add a note for the kitchen…"
+        />
+        {list.maxLength != null && (
+          <div className="mt-1 text-[10px] text-romolo-warm-gray text-right">
+            {(text ?? "").length}/{list.maxLength}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const isSingle = list.selectionType === "SINGLE";
 
   const toggle = (id: string) => {
     if (isSingle) {
-      onChange([id]);
+      // SINGLE-select with an optional list (minSelected === 0): allow deselect.
+      if (selectedIds.includes(id) && list.minSelected === 0) {
+        onChange([]);
+      } else {
+        onChange([id]);
+      }
       return;
     }
     if (selectedIds.includes(id)) {
@@ -30,11 +66,16 @@ export function ModifierSet({
     }
   };
 
+  const required = list.minSelected > 0;
   const helper = isSingle
-    ? "Choose one"
+    ? required
+      ? "Choose one"
+      : "Optional"
     : list.maxSelected != null
     ? `Up to ${list.maxSelected}`
-    : "Choose any";
+    : required
+    ? `At least ${list.minSelected}`
+    : "Optional";
 
   return (
     <div className="mb-4">

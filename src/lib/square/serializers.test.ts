@@ -1,26 +1,8 @@
 import { describe, it, expect } from "vitest";
-import {
-  serializeItem,
-  serializeModifierList,
-  isCannoliCategory,
-} from "./serializers";
-
-describe("isCannoliCategory", () => {
-  it("returns true for category names containing Cannoli (any case)", () => {
-    expect(isCannoliCategory("Cannoli")).toBe(true);
-    expect(isCannoliCategory("cannoli")).toBe(true);
-    expect(isCannoliCategory("Cannoli Online")).toBe(true);
-  });
-
-  it("returns false for unrelated categories", () => {
-    expect(isCannoliCategory("Ice Cream")).toBe(false);
-    expect(isCannoliCategory("Cookie")).toBe(false);
-    expect(isCannoliCategory(undefined)).toBe(false);
-  });
-});
+import { serializeItem, serializeModifierList } from "./serializers";
 
 describe("serializeModifierList", () => {
-  it("maps a SINGLE-select Square modifier list", () => {
+  it("maps a SINGLE-select Square modifier list with explicit min", () => {
     const result = serializeModifierList(
       {
         type: "MODIFIER_LIST",
@@ -28,6 +10,8 @@ describe("serializeModifierList", () => {
         modifierListData: {
           name: "Cookie Flavors",
           selectionType: "SINGLE",
+          minSelectedModifiers: 1,
+          maxSelectedModifiers: 1,
           modifiers: [
             {
               type: "MODIFIER",
@@ -45,11 +29,34 @@ describe("serializeModifierList", () => {
     expect(result).toEqual({
       id: "ML1",
       name: "Cookie Flavors",
+      modifierType: "list",
       selectionType: "SINGLE",
       minSelected: 1,
       maxSelected: 1,
       modifiers: [{ id: "M1", name: "Amaretti", priceCents: 0 }],
     });
+  });
+
+  it("defaults SINGLE-select min to 0 when Square leaves min unset", () => {
+    const result = serializeModifierList({
+      type: "MODIFIER_LIST",
+      id: "ML_OPT",
+      modifierListData: {
+        name: "Toppings",
+        selectionType: "SINGLE",
+        // no minSelectedModifiers
+        modifiers: [
+          {
+            type: "MODIFIER",
+            id: "M_TOP",
+            modifierData: { name: "No Cherry" },
+          },
+        ],
+      },
+    } as any);
+    expect(result.minSelected).toBe(0);
+    expect(result.maxSelected).toBe(null);
+    expect(result.modifierType).toBe("list");
   });
 
   it("maps a MULTIPLE-select list with a price upcharge", () => {
@@ -91,6 +98,41 @@ describe("serializeModifierList", () => {
     } as any);
     expect(result.modifiers).toEqual([]);
   });
+
+  it("maps a TEXT modifier list to a free-text shape", () => {
+    const result = serializeModifierList({
+      type: "MODIFIER_LIST",
+      id: "ML_TEXT",
+      modifierListData: {
+        name: "Cannoli Special Notes",
+        selectionType: "SINGLE",
+        modifierType: "TEXT",
+        maxLength: 150,
+        textRequired: false,
+      },
+    } as any);
+    expect(result.modifierType).toBe("text");
+    expect(result.maxLength).toBe(150);
+    expect(result.textRequired).toBe(false);
+    expect(result.minSelected).toBe(0);
+    expect(result.modifiers).toEqual([]);
+  });
+
+  it("marks a TEXT modifier list required when textRequired is true", () => {
+    const result = serializeModifierList({
+      type: "MODIFIER_LIST",
+      id: "ML_TEXT_REQ",
+      modifierListData: {
+        name: "Required Note",
+        selectionType: "SINGLE",
+        modifierType: "TEXT",
+        textRequired: true,
+      },
+    } as any);
+    expect(result.modifierType).toBe("text");
+    expect(result.minSelected).toBe(1);
+    expect(result.textRequired).toBe(true);
+  });
 });
 
 describe("serializeItem", () => {
@@ -122,6 +164,7 @@ describe("serializeItem", () => {
     {
       id: "ML1",
       name: "Cookie Flavors",
+      modifierType: "list" as const,
       selectionType: "SINGLE" as const,
       minSelected: 1,
       maxSelected: 1,
@@ -130,9 +173,7 @@ describe("serializeItem", () => {
   ];
 
   it("maps an item with one variation and one attached modifier list", () => {
-    const result = serializeItem(baseItem, "Cookie", modifierLists, {
-      // empty stock map ⇒ in stock by default for non-stockable
-    });
+    const result = serializeItem(baseItem, "Cookie", modifierLists, {});
     expect(result.id).toBe("I1");
     expect(result.name).toBe("Cookies");
     expect(result.categoryName).toBe("Cookie");
@@ -145,6 +186,38 @@ describe("serializeItem", () => {
     });
     expect(result.modifierLists).toHaveLength(1);
     expect(result.modifierLists[0].id).toBe("ML1");
+    expect(result.modifierLists[0].minSelected).toBe(1);
+  });
+
+  it("applies per-attachment min/max overrides from modifierListInfo", () => {
+    const item = {
+      type: "ITEM",
+      id: "I_OVERRIDE",
+      itemData: {
+        name: "Item",
+        variations: [
+          {
+            type: "ITEM_VARIATION",
+            id: "V",
+            itemVariationData: {
+              name: "Default",
+              priceMoney: { amount: BigInt(100), currency: "USD" },
+            },
+          },
+        ],
+        modifierListInfo: [
+          {
+            modifierListId: "ML1",
+            enabled: true,
+            minSelectedModifiers: 0,
+            maxSelectedModifiers: 2,
+          },
+        ],
+      },
+    } as any;
+    const result = serializeItem(item, "Cat", modifierLists, {});
+    expect(result.modifierLists[0].minSelected).toBe(0);
+    expect(result.modifierLists[0].maxSelected).toBe(2);
   });
 
   it("marks a stockable variation out of stock when count is zero", () => {
@@ -165,9 +238,7 @@ describe("serializeItem", () => {
         ],
       },
     };
-    const result = serializeItem(stockableItem, "Ice Cream", [], {
-      V2: 0,
-    });
+    const result = serializeItem(stockableItem, "Ice Cream", [], { V2: 0 });
     expect(result.variations[0].inStock).toBe(false);
   });
 
@@ -189,9 +260,7 @@ describe("serializeItem", () => {
         ],
       },
     };
-    const result = serializeItem(stockableItem, "Ice Cream", [], {
-      V3: 5,
-    });
+    const result = serializeItem(stockableItem, "Ice Cream", [], { V3: 5 });
     expect(result.variations[0].inStock).toBe(true);
   });
 
@@ -250,6 +319,7 @@ describe("serializeItem", () => {
       {
         id: "ML_ON",
         name: "On",
+        modifierType: "list" as const,
         selectionType: "SINGLE" as const,
         minSelected: 1,
         maxSelected: 1,
@@ -258,6 +328,7 @@ describe("serializeItem", () => {
       {
         id: "ML_OFF",
         name: "Off",
+        modifierType: "list" as const,
         selectionType: "SINGLE" as const,
         minSelected: 1,
         maxSelected: 1,

@@ -22,6 +22,7 @@ type OrderLine = {
   variationId: string;  // SnapshotVariation.id
   qty: number;
   modifiers: Record<string, string[]>; // modifierListId -> selected modifier ids
+  freeText: Record<string, string>;    // modifierListId (TEXT) -> entered text
 };
 
 type Order = {
@@ -36,6 +37,22 @@ type Order = {
 };
 
 const lineId = () => Math.random().toString(36).slice(2, 8);
+
+// Seed defaults for a fresh OrderLine: leaves required SINGLE-list selections
+// empty (user must pick) so the "required" enforcement works, but pre-fills
+// nothing for optional / TEXT / MULTIPLE lists.
+function seedSelectionsForItem(item: { modifierLists: import("@/lib/square/types").SnapshotModifierList[] }) {
+  const modifiers: Record<string, string[]> = {};
+  const freeText: Record<string, string> = {};
+  for (const ml of item.modifierLists) {
+    if (ml.modifierType === "text") {
+      freeText[ml.id] = "";
+    } else {
+      modifiers[ml.id] = [];
+    }
+  }
+  return { modifiers, freeText };
+}
 
 const initialOrder = (): Order => ({
   date: "",
@@ -56,6 +73,12 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
   const variation = item.variations.find((v) => v.id === line.variationId);
   if (!variation || !variation.inStock) return false;
   for (const ml of item.modifierLists) {
+    if (ml.modifierType === "text") {
+      const text = (line.freeText[ml.id] ?? "").trim();
+      if (ml.minSelected > 0 && text.length === 0) return false;
+      if (ml.maxLength != null && text.length > ml.maxLength) return false;
+      continue;
+    }
     const sel = line.modifiers[ml.id] ?? [];
     if (sel.length < ml.minSelected) return false;
     if (ml.maxSelected != null && sel.length > ml.maxSelected) return false;
@@ -115,11 +138,24 @@ export default function OrderFlow() {
         sourceId: tokenResult.token,
         pickupAt,
         contact: order.contact,
-        lines: order.lines.map((l) => ({
-          catalogObjectId: l.variationId,
-          quantity: l.qty,
-          modifiers: Object.values(l.modifiers).flat(),
-        })),
+        lines: order.lines.map((l) => {
+          const item = snapshot.items.find((i) => i.id === l.itemId);
+          const noteParts: string[] = [];
+          if (item) {
+            for (const ml of item.modifierLists) {
+              if (ml.modifierType !== "text") continue;
+              const text = (l.freeText[ml.id] ?? "").trim();
+              if (text.length === 0) continue;
+              noteParts.push(`${ml.name}: ${text}`);
+            }
+          }
+          return {
+            catalogObjectId: l.variationId,
+            quantity: l.qty,
+            modifiers: Object.values(l.modifiers).flat(),
+            ...(noteParts.length > 0 ? { note: noteParts.join(" | ") } : {}),
+          };
+        }),
       }),
     });
 
@@ -482,14 +518,8 @@ function StepWhat({
     const firstItem = snapshot.items[0];
     if (!firstItem) return;
     const firstVariation = firstItem.variations.find((v) => v.inStock) ?? firstItem.variations[0];
-    const seedModifiers: Record<string, string[]> = {};
-    for (const ml of firstItem.modifierLists) {
-      if (ml.selectionType === "SINGLE" && ml.modifiers[0]) {
-        seedModifiers[ml.id] = [ml.modifiers[0].id];
-      } else {
-        seedModifiers[ml.id] = [];
-      }
-    }
+    const { modifiers: seedModifiers, freeText: seedFreeText } =
+      seedSelectionsForItem(firstItem);
     setOrder({
       ...order,
       lines: [
@@ -500,6 +530,7 @@ function StepWhat({
           variationId: firstVariation?.id ?? "",
           qty: 1,
           modifiers: seedModifiers,
+          freeText: seedFreeText,
         },
       ],
     });
@@ -556,19 +587,14 @@ function OrderLineEditor({
     const next = snapshot.items.find((i) => i.id === id);
     if (!next) return;
     const firstVariation = next.variations.find((v) => v.inStock) ?? next.variations[0];
-    const seedModifiers: Record<string, string[]> = {};
-    for (const ml of next.modifierLists) {
-      if (ml.selectionType === "SINGLE" && ml.modifiers[0]) {
-        seedModifiers[ml.id] = [ml.modifiers[0].id];
-      } else {
-        seedModifiers[ml.id] = [];
-      }
-    }
+    const { modifiers: seedModifiers, freeText: seedFreeText } =
+      seedSelectionsForItem(next);
     onChange({
       itemId: id,
       variationId: firstVariation?.id ?? "",
       qty: 1,
       modifiers: seedModifiers,
+      freeText: seedFreeText,
     });
   };
 
@@ -630,6 +656,10 @@ function OrderLineEditor({
           selectedIds={line.modifiers[ml.id] ?? []}
           onChange={(ids) =>
             onChange({ modifiers: { ...line.modifiers, [ml.id]: ids } })
+          }
+          text={line.freeText[ml.id] ?? ""}
+          onTextChange={(value) =>
+            onChange({ freeText: { ...line.freeText, [ml.id]: value } })
           }
         />
       ))}

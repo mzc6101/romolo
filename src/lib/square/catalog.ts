@@ -1,10 +1,6 @@
 import "server-only";
 import { squareClient, squareLocationId } from "./client";
-import {
-  isCannoliCategory,
-  serializeItem,
-  serializeModifierList,
-} from "./serializers";
+import { serializeItem, serializeModifierList } from "./serializers";
 import type { SnapshotItem } from "./types";
 
 export async function getCatalog(): Promise<{
@@ -64,8 +60,6 @@ export async function getCatalog(): Promise<{
     const categoryName = categoryId
       ? categoriesById.get(categoryId)
       : undefined;
-
-    if (isCannoliCategory(categoryName)) continue; // out of scope
 
     items.push(
       serializeItem(raw, categoryName, allModifierLists, stockByVariationId)

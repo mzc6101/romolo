@@ -5,11 +5,6 @@ import type {
   SnapshotVariation,
 } from "./types";
 
-export function isCannoliCategory(name?: string): boolean {
-  if (!name) return false;
-  return name.toLowerCase().includes("cannoli");
-}
-
 export function serializeModifier(raw: any): SnapshotModifier {
   const data = raw.modifierData ?? {};
   const amount = data.priceMoney?.amount;
@@ -20,22 +15,44 @@ export function serializeModifier(raw: any): SnapshotModifier {
   };
 }
 
-// NOTE: We currently derive min/max selection counts from `selectionType` only.
-// Square's modern API exposes `minSelectedModifiers` / `maxSelectedModifiers`
-// at both the modifier list and the per-item attachment (`modifierListInfo`),
-// which override the list-level values. We intentionally ignore those for the
-// Sandbox MVP — adding precise constraints (e.g. "must pick at least 2 of 5
-// toppings") is deferred until a real merchant catalog needs it.
+// Modifier list metadata is read directly from Square. We honor:
+//   - modifier_type: "LIST" (default) | "TEXT" (free-text input)
+//   - selection_type: "SINGLE" | "MULTIPLE"
+//   - min_selected_modifiers / max_selected_modifiers (null = unset)
+//   - text fields (max_length, text_required) for TEXT lists
+// `min` and `max` can be overridden per-attachment via modifier_list_info on
+// the item — that override is applied in serializeItem.
 export function serializeModifierList(raw: any): SnapshotModifierList {
   const data = raw.modifierListData ?? {};
+  const modifierType: "list" | "text" =
+    data.modifierType === "TEXT" ? "text" : "list";
   const selectionType: "SINGLE" | "MULTIPLE" =
     data.selectionType === "MULTIPLE" ? "MULTIPLE" : "SINGLE";
-  const minSelected = selectionType === "SINGLE" ? 1 : 0;
-  const maxSelected = selectionType === "SINGLE" ? 1 : null;
+
+  const rawMin = data.minSelectedModifiers;
+  const rawMax = data.maxSelectedModifiers;
+  const minSelected = rawMin != null ? Number(rawMin) : 0;
+  const maxSelected = rawMax != null ? Number(rawMax) : null;
+
+  if (modifierType === "text") {
+    return {
+      id: raw.id,
+      name: data.name ?? "",
+      modifierType,
+      selectionType,
+      minSelected: data.textRequired ? 1 : 0,
+      maxSelected: 1,
+      modifiers: [],
+      maxLength:
+        data.maxLength != null ? Number(data.maxLength) : undefined,
+      textRequired: data.textRequired === true,
+    };
+  }
 
   return {
     id: raw.id,
     name: data.name ?? "",
+    modifierType,
     selectionType,
     minSelected,
     maxSelected,
@@ -79,13 +96,23 @@ export function serializeItem(
   stockByVariationId: Record<string, number>
 ): SnapshotItem {
   const data = raw.itemData ?? {};
-  const attachedListIds: string[] = (data.modifierListInfo ?? [])
-    .filter((info: any) => info.enabled !== false)
-    .map((info: any) => info.modifierListId);
-
-  const modifierLists = allModifierLists.filter((ml) =>
-    attachedListIds.includes(ml.id)
+  const enabledInfos: any[] = (data.modifierListInfo ?? []).filter(
+    (info: any) => info.enabled !== false
   );
+
+  const modifierLists: SnapshotModifierList[] = [];
+  for (const info of enabledInfos) {
+    const base = allModifierLists.find((ml) => ml.id === info.modifierListId);
+    if (!base) continue;
+    // Per-attachment min/max override the list-level values when present.
+    const overrideMin = info.minSelectedModifiers;
+    const overrideMax = info.maxSelectedModifiers;
+    modifierLists.push({
+      ...base,
+      minSelected: overrideMin != null ? Number(overrideMin) : base.minSelected,
+      maxSelected: overrideMax != null ? Number(overrideMax) : base.maxSelected,
+    });
+  }
 
   return {
     id: raw.id,
