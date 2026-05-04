@@ -1,24 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MENU_DATA, fmt } from "@/lib/data";
 import { useOrder } from "./OrderProvider";
 
 export default function Menu() {
-  const { open, flavors, toggleFlavor } = useOrder();
+  const { open } = useOrder();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ name: string; now: boolean } | null>(null);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2400);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const handleToggle = (id: string) => {
-    const info = toggleFlavor(id);
-    if (info.name) setToast(info);
-  };
 
   return (
     <section id="menu" className="py-24 md:py-36 bg-white">
@@ -37,77 +25,6 @@ export default function Menu() {
           <p className="mt-10 max-w-2xl text-[17px] text-romolo-warm-gray leading-relaxed">
             Each cannolo is filled to order to preserve that perfect crunch. Flavors rotate every two to three days — what&apos;s in the case today is what we made today.
           </p>
-        </div>
-
-        {/* Square sync banner */}
-        <div
-          className="flex items-center gap-3 mb-8 max-w-md rounded-sm px-3.5 py-2.5 text-[12px]"
-          style={{
-            background: "#f0f7f8",
-            border: "1px solid #c7dde0",
-            color: "#2a5a63",
-          }}
-        >
-          <span className="relative inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "#2da66f" }}>
-            <span
-              aria-hidden
-              className="absolute -inset-[3px] rounded-full opacity-60"
-              style={{
-                border: "2px solid #2da66f",
-                animation: "pulse-ring 2s ease-out infinite",
-              }}
-            />
-          </span>
-          <div>
-            <strong>Live from Square</strong> — prices and availability synced{" "}
-            {MENU_DATA[0].squareSyncedAt}
-          </div>
-        </div>
-
-        {/* Today's flavor rotation */}
-        <div className="rounded-sm bg-romolo-cream border border-romolo-border p-5 md:p-7 animate-on-scroll">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-            <div>
-              <h3 className="font-[var(--font-serif)] text-2xl font-medium m-0 text-romolo-charcoal">
-                Today&apos;s Flavors
-              </h3>
-              <p className="text-romolo-warm-gray text-[13px] mt-1 m-0">
-                Rotated every 2–3 days. Toggle a flavor in Square and it disappears here.
-              </p>
-            </div>
-            <span className="text-[11px] tracking-[0.2em] uppercase text-romolo-warm-gray">
-              Updated 2 min ago
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {flavors.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => handleToggle(f.id)}
-                title={`Click to ${f.available ? "disable" : "enable"} (simulates the Square modifier toggle)`}
-                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[13px] font-medium transition-all ${
-                  f.available
-                    ? "bg-white text-romolo-charcoal border border-romolo-border"
-                    : "text-[#a8a39d] line-through"
-                }`}
-                style={{
-                  background: f.available ? "white" : "rgba(0,0,0,0.04)",
-                  borderStyle: f.available ? "solid" : "dashed",
-                  borderColor: f.available ? "var(--color-romolo-border)" : "#c0bbb3",
-                  borderWidth: 1,
-                }}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{
-                    background: f.available ? f.color : "transparent",
-                    border: f.available ? "1px solid rgba(0,0,0,0.1)" : "1px dashed #c0bbb3",
-                  }}
-                />
-                {f.name}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Menu categories */}
@@ -180,32 +97,6 @@ export default function Menu() {
         </div>
       </div>
 
-      {/* Admin toast */}
-      {toast && (
-        <div
-          className="fixed bottom-6 left-6 z-[80] max-w-xs px-4 py-3.5 rounded text-sm text-white"
-          style={{
-            background: "#1a1a1a",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-            animation: "fade-up 0.3s var(--ease-out-expo)",
-          }}
-        >
-          <div className="font-semibold mb-1">
-            Square modifier {toast.now ? "enabled" : "disabled"}
-          </div>
-          <div className="text-xs opacity-70">
-            &ldquo;{toast.name}&rdquo;{" "}
-            {toast.now ? "is now selectable" : "removed from order flow"} on the website.
-          </div>
-        </div>
-      )}
-
-      <style jsx global>{`
-        @keyframes pulse-ring {
-          0% { transform: scale(0.6); opacity: 0.7; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-      `}</style>
     </section>
   );
 }
