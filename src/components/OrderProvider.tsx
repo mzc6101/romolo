@@ -1,7 +1,16 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { INITIAL_FLAVORS, type Flavor } from "@/lib/data";
+import type { MenuSnapshot } from "@/lib/square/types";
 
 type OrderContextValue = {
   isOpen: boolean;
@@ -10,11 +19,18 @@ type OrderContextValue = {
   flavors: Flavor[];
   setFlavors: (flavors: Flavor[]) => void;
   toggleFlavor: (id: string) => { name: string; now: boolean };
+  snapshot: MenuSnapshot;
 };
 
 const OrderContext = createContext<OrderContextValue | null>(null);
 
-export function OrderProvider({ children }: { children: ReactNode }) {
+export function OrderProvider({
+  children,
+  initialSnapshot,
+}: {
+  children: ReactNode;
+  initialSnapshot: MenuSnapshot;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [flavors, setFlavors] = useState<Flavor[]>(INITIAL_FLAVORS);
 
@@ -24,7 +40,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const toggleFlavor = useCallback((id: string) => {
     let toastInfo = { name: "", now: false };
     setFlavors((prev) => {
-      const next = prev.map((f) => (f.id === id ? { ...f, available: !f.available } : f));
+      const next = prev.map((f) =>
+        f.id === id ? { ...f, available: !f.available } : f
+      );
       const updated = next.find((f) => f.id === id);
       if (updated) toastInfo = { name: updated.name, now: updated.available };
       return next;
@@ -40,8 +58,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [isOpen]);
 
   const value = useMemo(
-    () => ({ isOpen, open, close, flavors, setFlavors, toggleFlavor }),
-    [isOpen, open, close, flavors, toggleFlavor]
+    () => ({
+      isOpen,
+      open,
+      close,
+      flavors,
+      setFlavors,
+      toggleFlavor,
+      snapshot: initialSnapshot,
+    }),
+    [isOpen, open, close, flavors, toggleFlavor, initialSnapshot]
   );
 
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;

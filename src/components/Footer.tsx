@@ -9,7 +9,7 @@ export default function Footer() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div>
               <h3 className="font-[var(--font-serif)] text-2xl md:text-3xl font-light mb-1">
-                Stay in the <span className="italic">Loop</span>
+                Stay in the <span className="italic">Loop</span> POSSIBLY REMOVE
               </h3>
               <p className="text-sm text-white/50">
                 New flavors, seasonal specials, and the occasional love letter.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Cormorant_Garamond, DM_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -25,6 +26,11 @@ export const metadata: Metadata = {
   },
 };
 
+const SQUARE_SDK_URL =
+  process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT === "production"
+    ? "https://web.squarecdn.com/v1/square.js"
+    : "https://sandbox.web.squarecdn.com/v1/square.js";
+
 export default function RootLayout({
   children,
 }: {
@@ -32,7 +38,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Script src={SQUARE_SDK_URL} strategy="afterInteractive" />
+      </body>
     </html>
   );
 }

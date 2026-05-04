@@ -1,8 +1,21 @@
+/**
+ * NOTE (Square integration milestone):
+ * The exports in this file are no longer used by the active Order Flow.
+ * They remain as Cannoli scaffolding (`MENU_DATA` items, `INITIAL_FLAVORS`,
+ * `DELIVERY_ZONES`, `REVIEWS`, `fmt`) for parts of the homepage that still
+ * reference them — see Menu.tsx, Testimonials.tsx — and for re-use when
+ * Cannoli ordering is wired in. Do not add new menu items here. Live order
+ * data comes from `loadSnapshot()` in `app/page.tsx`, which calls
+ * `getCatalog()` and `getOpenPeriods()` from `lib/square/`.
+ */
+
 export type MenuItem = {
   id: string;
   name: string;
   description: string;
   price: number;
+  /** Optional thumbnail in the menu grid */
+  imageUrl?: string;
 };
 
 export type MenuCategory = {
@@ -21,12 +34,16 @@ export const MENU_DATA: MenuCategory[] = [
         name: "Cannoli — Full Size",
         description: "Crispy shell filled to order with sweet ricotta",
         price: 4.5,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679870/_N8Z0944_odj3da.jpg",
       },
       {
         id: "cannoli-mini",
         name: "Cannoli — Mini",
         description: "Bite-sized, sold by the dozen for sharing",
         price: 2.25,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328556/_N8Z0787_acdfse.jpg",
       },
       {
         id: "cannoli-kit",
@@ -34,6 +51,8 @@ export const MENU_DATA: MenuCategory[] = [
         description:
           "Shells and filling to assemble at home — sold in multiples of 6",
         price: 18.0,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679842/_N8Z0606_wcehwu.jpg",
       },
     ],
   },
@@ -46,30 +65,40 @@ export const MENU_DATA: MenuCategory[] = [
         name: "Chocolate Banana",
         description: "Frozen banana dipped in rich chocolate",
         price: 3.5,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
       },
       {
         id: "cookie",
         name: "Cookie",
         description: "Amaretti, Rainbow, or Cucidati",
         price: 2.0,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328740/_N8Z0782_lir3xp.jpg",
       },
       {
         id: "spumoni",
         name: "Spumoni Wedge",
         description: "Tri-color ice cream with candied fruit & nuts",
         price: 5.5,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328772/_N8Z0935_ggdfvc.jpg",
       },
       {
         id: "tartufi",
         name: "Tartufi",
         description: "Chocolate-coated truffle with a molten center",
         price: 6.0,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328834/_N8Z0941_g0bjmw.jpg",
       },
       {
         id: "tiramisu",
         name: "Tiramisu",
         description: "Espresso ladyfingers layered with mascarpone",
         price: 7.5,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328873/_N8Z0797-Edit_jvlpx4.jpg",
       },
     ],
   },
@@ -82,6 +111,8 @@ export const MENU_DATA: MenuCategory[] = [
         name: "Ice Cream",
         description: "Italian-style, rotating flavors",
         price: 4.0,
+        imageUrl:
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328923/_N8Z0923_t1i9rl.jpg",
       },
       {
         id: "milkshake",

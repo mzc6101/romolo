@@ -1,0 +1,115 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    Square?: any;
+  }
+}
+
+export type SquareCardHandle = {
+  tokenize: () => Promise<{ token: string } | { error: string }>;
+};
+
+export function SquareCard({
+  onReady,
+  onError,
+}: {
+  onReady?: (handle: SquareCardHandle) => void;
+  onError?: (msg: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Keep callback refs current without re-running the mount effect.
+  useEffect(() => {
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+  }, [onReady, onError]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let cardInstance: any = null;
+
+    async function init() {
+      const appId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
+      const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
+      if (!appId || !locationId) {
+        setStatus("error");
+        setErrorMsg("Square is not configured.");
+        onErrorRef.current?.("Square is not configured.");
+        return;
+      }
+
+      // Wait for the SDK to load (script is in layout.tsx)
+      const start = Date.now();
+      while (!window.Square && Date.now() - start < 8000) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      if (!window.Square) {
+        setStatus("error");
+        setErrorMsg("Card field couldn't load — please refresh.");
+        onErrorRef.current?.("Square SDK failed to load");
+        return;
+      }
+      if (cancelled) return;
+
+      try {
+        const payments = window.Square.payments(appId, locationId);
+        cardInstance = await payments.card();
+        await cardInstance.attach(containerRef.current);
+        if (cancelled) {
+          await cardInstance.destroy();
+          return;
+        }
+        setStatus("ready");
+        onReadyRef.current?.({
+          tokenize: async () => {
+            const result = await cardInstance.tokenize();
+            if (result.status === "OK") {
+              return { token: result.token };
+            }
+            const errors = result.errors ?? [];
+            return {
+              error:
+                errors[0]?.message ?? "Card could not be processed.",
+            };
+          },
+        });
+      } catch (err: any) {
+        if (cancelled) return;
+        setStatus("error");
+        setErrorMsg(err?.message ?? "Card field error.");
+        onErrorRef.current?.(err?.message ?? "Card field error.");
+      }
+    }
+
+    init();
+
+    return () => {
+      cancelled = true;
+      if (cardInstance) {
+        cardInstance.destroy?.().catch(() => {});
+      }
+    };
+  }, []);
+
+  return (
+    <div>
+      <div
+        ref={containerRef}
+        className="p-3 border border-romolo-border rounded-sm bg-white min-h-[60px]"
+      />
+      {status === "loading" && (
+        <div className="mt-2 text-xs text-romolo-warm-gray">Loading secure card field…</div>
+      )}
+      {status === "error" && (
+        <div className="mt-2 text-xs text-romolo-red">{errorMsg}</div>
+      )}
+    </div>
+  );
+}

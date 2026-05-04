@@ -27,22 +27,11 @@ export default function Testimonials() {
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage:
-            "url('https://res.cloudinary.com/dhv6sobkv/image/upload/v1775679180/Nonni_cc9rny.avif')",
+            "url('https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777327598/_N8Z0999-VSCO_baxepo.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
           filter: "grayscale(1) contrast(1.05) brightness(0.95)",
           opacity: 0.16,
-        }}
-      />
-      {/* Faux red+white tile motif — placeholder until storefront photo is approved */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, rgba(255,255,255,0.18) 0 22px, transparent 22px 50px)," +
-            "repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0 22px, transparent 22px 50px)",
-          mixBlendMode: "overlay",
         }}
       />
       {/* Vignette */}
