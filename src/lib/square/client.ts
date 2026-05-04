@@ -1,5 +1,5 @@
 import "server-only";
-import { SquareClient } from "square";
+import { SquareClient, SquareEnvironment } from "square";
 
 let cached: SquareClient | null = null;
 
@@ -11,7 +11,12 @@ export function squareClient(): SquareClient {
       "SQUARE_ACCESS_TOKEN is not set. Configure it in Railway env vars (or in your shell for local dev)."
     );
   }
-  cached = new SquareClient({ token });
+  const envName = process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT;
+  const environment =
+    envName === "production"
+      ? SquareEnvironment.Production
+      : SquareEnvironment.Sandbox;
+  cached = new SquareClient({ token, environment });
   return cached;
 }
 
