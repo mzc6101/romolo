@@ -5,6 +5,48 @@ import type {
   SnapshotVariation,
 } from "./types";
 
+// Splits a Square item whose variations follow "<form-factor> - <size>" naming
+// (e.g. "Cannoli Online" with Full Size/Mini Size/Kit variations) into one
+// SnapshotItem per form-factor. Variation IDs are preserved so they still
+// resolve as catalog_object_id at order time. Variation names are trimmed to
+// the size portion only ("Set of 6", "Single", etc.).
+//
+// `nameOverrides` lets callers map a form-factor to a custom display name —
+// e.g. { "Kit": "Cannoli Kit" } — falling back to "<form> <baseName>".
+// Returns the original item unchanged if no variation parses.
+export function splitItemByFormFactor(
+  item: SnapshotItem,
+  nameOverrides?: Record<string, string>
+): SnapshotItem[] {
+  const order: string[] = [];
+  const groups = new Map<string, SnapshotVariation[]>();
+  let unparsed = false;
+  for (const v of item.variations) {
+    const m = v.name.match(/^\s*(.+?)\s+-\s+(.+?)\s*$/);
+    if (!m) {
+      unparsed = true;
+      break;
+    }
+    const form = m[1];
+    const size = m[2];
+    if (!groups.has(form)) {
+      groups.set(form, []);
+      order.push(form);
+    }
+    groups.get(form)!.push({ ...v, name: size });
+  }
+  if (unparsed || groups.size === 0) return [item];
+
+  return order.map((form) => ({
+    id: `${item.id}__${form.replace(/\s+/g, "_").toLowerCase()}`,
+    name: nameOverrides?.[form] ?? `${form} ${item.name}`,
+    description: item.description,
+    categoryName: item.categoryName,
+    variations: groups.get(form)!,
+    modifierLists: item.modifierLists,
+  }));
+}
+
 export function serializeModifier(raw: any): SnapshotModifier {
   const data = raw.modifierData ?? {};
   const amount = data.priceMoney?.amount;

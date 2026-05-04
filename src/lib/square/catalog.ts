@@ -1,7 +1,22 @@
 import "server-only";
 import { squareClient, squareLocationId } from "./client";
-import { serializeItem, serializeModifierList } from "./serializers";
+import {
+  serializeItem,
+  serializeModifierList,
+  splitItemByFormFactor,
+} from "./serializers";
 import type { SnapshotItem } from "./types";
+
+// Square models cannoli as one item ("Cannoli Online") with 7 variations
+// across Full Size / Mini Size / Kit form-factors. The frontend treats each
+// form-factor as its own item, so we split on ingest. Display names below
+// override the default "<form> <baseName>" label.
+const CANNOLI_ITEM_NAME = "Cannoli Online";
+const CANNOLI_FORM_NAMES: Record<string, string> = {
+  "Full Size": "Full Size Cannoli",
+  "Mini Size": "Mini Size Cannoli",
+  "Kit": "Cannoli Kit",
+};
 
 export async function getCatalog(): Promise<{
   items: SnapshotItem[];
@@ -61,9 +76,17 @@ export async function getCatalog(): Promise<{
       ? categoriesById.get(categoryId)
       : undefined;
 
-    items.push(
-      serializeItem(raw, categoryName, allModifierLists, stockByVariationId)
+    const serialized = serializeItem(
+      raw,
+      categoryName,
+      allModifierLists,
+      stockByVariationId
     );
+    if (serialized.name === CANNOLI_ITEM_NAME) {
+      items.push(...splitItemByFormFactor(serialized, CANNOLI_FORM_NAMES));
+    } else {
+      items.push(serialized);
+    }
   }
 
   return { items };
