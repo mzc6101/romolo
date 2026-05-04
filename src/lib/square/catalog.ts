@@ -5,7 +5,7 @@ import {
   serializeItem,
   serializeModifierList,
 } from "./serializers";
-import type { MenuSnapshot, SnapshotItem, OpenPeriods } from "./types";
+import type { SnapshotItem } from "./types";
 
 export async function getCatalog(): Promise<{
   items: SnapshotItem[];
@@ -73,17 +73,4 @@ export async function getCatalog(): Promise<{
   }
 
   return { items };
-}
-
-export async function getMenuSnapshot(
-  hours: OpenPeriods
-): Promise<MenuSnapshot> {
-  const { items } = await getCatalog();
-  return {
-    fetchedAt: new Date().toISOString(),
-    locationId: squareLocationId(),
-    currency: "USD",
-    items,
-    hours,
-  };
 }
