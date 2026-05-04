@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useOrder } from "./OrderProvider";
 import { VariationPicker } from "./order/VariationPicker";
 import { ModifierSet } from "./order/ModifierSet";
+import { SquareCard, type SquareCardHandle } from "./order/SquareCard";
 import type { MenuSnapshot } from "@/lib/square/types";
 
 type Contact = { name: string; phone: string; email: string };
@@ -32,6 +33,7 @@ type Order = {
   contact: Contact;
   cardOk: boolean;
   confirmation: string;
+  idempotencyKey?: string;
 };
 
 const lineId = () => Math.random().toString(36).slice(2, 8);
@@ -68,11 +70,17 @@ export default function OrderFlow() {
   const { isOpen, close, snapshot } = useOrder();
   const [step, setStep] = useState(0);
   const [order, setOrder] = useState<Order>(initialOrder);
+  const [cardHandle, setCardHandle] = useState<SquareCardHandle | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setStep(0);
       setOrder(initialOrder());
+      setCardHandle(null);
+      setSubmitting(false);
+      setErrorBanner(null);
     }
   }, [isOpen]);
 
@@ -80,6 +88,58 @@ export default function OrderFlow() {
 
   const next = () => setStep((s) => Math.min(s + 1, 4));
   const back = () => setStep((s) => Math.max(s - 1, 0));
+
+  const placeOrder = async () => {
+    if (!cardHandle || submitting) return;
+    setSubmitting(true);
+    setErrorBanner(null);
+
+    const tokenResult = await cardHandle.tokenize();
+    if ("error" in tokenResult) {
+      setErrorBanner(tokenResult.error);
+      setSubmitting(false);
+      return;
+    }
+
+    const pickupAt = new Date(`${order.date}T${convert12to24(order.time)}:00`).toISOString();
+
+    const idempotencyKey = order.idempotencyKey || crypto.randomUUID();
+    if (!order.idempotencyKey) setOrder({ ...order, idempotencyKey });
+
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idempotencyKey,
+        sourceId: tokenResult.token,
+        pickupAt,
+        contact: order.contact,
+        lines: order.lines.map((l) => ({
+          catalogObjectId: l.variationId,
+          quantity: l.qty,
+          modifiers: Object.values(l.modifiers).flat(),
+        })),
+      }),
+    });
+
+    const result = await res.json();
+    setSubmitting(false);
+
+    if (result.status === "ok") {
+      setOrder({ ...order, confirmation: result.confirmation });
+      setStep(4);
+      return;
+    }
+    if (result.status === "card_declined") {
+      setErrorBanner(`Card declined: ${result.message}. Please try another card.`);
+      return;
+    }
+    if (result.status === "out_of_stock") {
+      setErrorBanner("One of your items just sold out. Go back and remove it to continue.");
+      return;
+    }
+    setErrorBanner("Something went wrong. Please call us at (650) 574-0625.");
+  };
 
   const canAdvance = (() => {
     if (step === 0) return !!order.date && !!order.time && order.timeAvailable;
@@ -138,7 +198,14 @@ export default function OrderFlow() {
           {step === 0 && <StepWhen order={order} setOrder={setOrder} />}
           {step === 1 && <StepWhat order={order} setOrder={setOrder} />}
           {step === 2 && <StepHow order={order} />}
-          {step === 3 && <StepPay order={order} setOrder={setOrder} />}
+          {step === 3 && (
+            <StepPay
+              order={order}
+              setOrder={setOrder}
+              setCardHandle={setCardHandle}
+              errorBanner={errorBanner}
+            />
+          )}
           {step === 4 && <StepDone order={order} onClose={close} />}
         </div>
 
@@ -158,15 +225,15 @@ export default function OrderFlow() {
               <button
                 onClick={() => {
                   if (step === 3) {
-                    setStep(4);
+                    placeOrder();
                   } else {
                     next();
                   }
                 }}
-                disabled={!canAdvance}
+                disabled={!canAdvance || submitting}
                 className="px-6 py-3 text-[12px] font-bold tracking-[0.15em] uppercase bg-romolo-red text-white hover:bg-romolo-red-dark transition-colors disabled:bg-[#d8d4ce] disabled:cursor-not-allowed rounded-sm"
               >
-                {step === 3 ? "Place order" : "Continue"}
+                {step === 3 ? (submitting ? "Placing..." : "Place order") : "Continue"}
               </button>
             </div>
           </div>
@@ -646,82 +713,90 @@ function StepHow({ order }: { order: Order }) {
 }
 
 // ─────────── Step 4: Pay ───────────
-function StepPay({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
+function StepPay({
+  order,
+  setOrder,
+  setCardHandle,
+  errorBanner,
+}: {
+  order: Order;
+  setOrder: (o: Order) => void;
+  setCardHandle: (h: SquareCardHandle | null) => void;
+  errorBanner: string | null;
+}) {
   return (
     <div>
       <StepHeader
         title="How would you like to pay?"
         subtitle="Secure checkout via Square. We don't store your card."
       />
+      {errorBanner && (
+        <div
+          className="mb-5 px-4 py-3 rounded-sm border text-sm"
+          style={{
+            background: "rgba(236, 56, 40, 0.06)",
+            borderColor: "rgba(236, 56, 40, 0.4)",
+            color: "var(--color-romolo-red)",
+          }}
+        >
+          {errorBanner}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2.5 mb-5">
         <input
           className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
           placeholder="Full name"
           value={order.contact.name}
-          onChange={(e) => setOrder({ ...order, contact: { ...order.contact, name: e.target.value } })}
+          onChange={(e) =>
+            setOrder({ ...order, contact: { ...order.contact, name: e.target.value } })
+          }
         />
         <input
           className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
           placeholder="Phone"
           value={order.contact.phone}
-          onChange={(e) => setOrder({ ...order, contact: { ...order.contact, phone: e.target.value } })}
+          onChange={(e) =>
+            setOrder({ ...order, contact: { ...order.contact, phone: e.target.value } })
+          }
         />
       </div>
       <input
         className="w-full mb-5 px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
         placeholder="Email — for the receipt"
+        type="email"
         value={order.contact.email}
-        onChange={(e) => setOrder({ ...order, contact: { ...order.contact, email: e.target.value } })}
+        onChange={(e) =>
+          setOrder({ ...order, contact: { ...order.contact, email: e.target.value } })
+        }
       />
 
       <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
         Card details
       </h5>
-      <div className="p-4 border border-romolo-border rounded-sm bg-romolo-cream flex flex-col gap-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray">
-            Square Web Payments
-          </span>
-          <span className="flex gap-1.5">
-            {["VISA", "MC", "AMEX"].map((c) => (
-              <span
-                key={c}
-                className="text-[10px] font-bold px-1.5 py-0.5 bg-white border border-romolo-border rounded text-romolo-warm-gray"
-              >
-                {c}
-              </span>
-            ))}
-          </span>
-        </div>
+      <SquareCard onReady={(h) => setCardHandle(h)} />
+
+      <label className="text-xs text-romolo-warm-gray flex gap-2 items-center mt-3">
         <input
-          className="w-full px-4 py-3 bg-white border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-          placeholder="Card number"
+          type="checkbox"
+          checked={order.cardOk}
+          onChange={(e) => setOrder({ ...order, cardOk: e.target.checked })}
         />
-        <div className="grid grid-cols-3 gap-2">
-          <input
-            className="px-4 py-3 bg-white border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-            placeholder="MM / YY"
-          />
-          <input
-            className="px-4 py-3 bg-white border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-            placeholder="CVC"
-          />
-          <input
-            className="px-4 py-3 bg-white border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-            placeholder="ZIP"
-          />
-        </div>
-        <label className="text-xs text-romolo-warm-gray flex gap-2 items-center mt-1">
-          <input
-            type="checkbox"
-            checked={order.cardOk}
-            onChange={(e) => setOrder({ ...order, cardOk: e.target.checked })}
-          />
-          I agree to the order — preview only, no real charge.
-        </label>
-      </div>
+        I agree to the order — my card will be charged on submit.
+      </label>
     </div>
   );
+}
+
+function convert12to24(t: string): string {
+  // "11:30am" -> "11:30"; "1:00pm" -> "13:00"
+  const m = t.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+  if (!m) return "00:00";
+  let h = Number(m[1]);
+  const min = m[2];
+  const ampm = m[3].toLowerCase();
+  if (ampm === "pm" && h !== 12) h += 12;
+  if (ampm === "am" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${min}`;
 }
 
 function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
