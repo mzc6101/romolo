@@ -611,7 +611,7 @@ function QtyStepper({
   );
 }
 
-// ─────────── Step 3: How (stub — Task 13 will replace) ───────────
+// ─────────── Step 3: How ───────────
 function StepHow({ order }: { order: Order }) {
   return (
     <div>
@@ -619,16 +619,28 @@ function StepHow({ order }: { order: Order }) {
         title="How do you want it?"
         subtitle="Pickup at the shop. Walk in, give your name, the cannoli are filled while you watch."
       />
-      <div className="p-4 bg-romolo-cream border border-romolo-border rounded-sm">
-        <div className="font-[var(--font-serif)] text-lg font-medium mb-1.5">
+
+      <div className="p-5 bg-romolo-cream border border-romolo-border rounded-sm">
+        <div className="text-[28px] mb-2">🛍️</div>
+        <div className="font-[var(--font-serif)] text-[22px] font-medium mb-1.5">
           81 W. 37th Ave, San Mateo CA 94403
         </div>
-        <div className="text-[13px] text-romolo-warm-gray leading-relaxed">
-          {order.date && order.time
-            ? `Pickup ${order.date} at ${order.time}.`
-            : "Pickup time confirmed in Step 1."}
+        <div className="text-[13px] text-romolo-warm-gray leading-relaxed mb-3">
+          Look for the red awning. Free street parking out front.
+        </div>
+        <div className="text-[13px] text-romolo-charcoal">
+          <strong>Pickup window:</strong>{" "}
+          {order.date && order.time ? `${order.date} at ${order.time}` : "—"}
         </div>
       </div>
+
+      <p className="text-xs text-romolo-warm-gray mt-4 italic">
+        Need delivery for an event? Call us at{" "}
+        <a href="tel:+16505740625" className="text-romolo-red underline">
+          (650) 574-0625
+        </a>
+        .
+      </p>
     </div>
   );
 }
