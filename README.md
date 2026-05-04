@@ -34,3 +34,37 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Square Integration
+
+The "Start an Order" modal is wired to Square Sandbox. The site requires the
+following env vars at build/run time. Set them in Railway via:
+
+```bash
+railway variables --set SQUARE_ACCESS_TOKEN=...
+railway variables --set SQUARE_LOCATION_ID=...
+railway variables --set NEXT_PUBLIC_SQUARE_APPLICATION_ID=...
+railway variables --set NEXT_PUBLIC_SQUARE_LOCATION_ID=...
+railway variables --set NEXT_PUBLIC_SQUARE_ENVIRONMENT=sandbox
+```
+
+| Variable | Used by | Source |
+|---|---|---|
+| `SQUARE_ACCESS_TOKEN` | server | Square Developer Dashboard → Sandbox → Credentials |
+| `SQUARE_LOCATION_ID` | server | Square Sandbox → Locations |
+| `NEXT_PUBLIC_SQUARE_APPLICATION_ID` | client | Square Developer Dashboard → App Settings |
+| `NEXT_PUBLIC_SQUARE_LOCATION_ID` | client | Same value as `SQUARE_LOCATION_ID` |
+| `NEXT_PUBLIC_SQUARE_ENVIRONMENT` | client | `sandbox` or `production` (selects Web Payments SDK URL) |
+
+`NEXT_PUBLIC_*` vars are inlined into the client bundle at build time. Because
+this project deploys via a Dockerfile, those vars must be declared as `ARG`
+inside the `builder` stage so Railway can forward them — already wired in
+`Dockerfile`. If you add new client-side env vars, declare them there too.
+
+To flip to Production later: replace `SQUARE_ACCESS_TOKEN` and the two
+`*_LOCATION_ID` vars with Production values, and set
+`NEXT_PUBLIC_SQUARE_ENVIRONMENT=production`.
+
+Catalog and inventory are revalidated every 15 minutes via Next.js
+`revalidate: 900`. Sanity-check the integration after deploy via
+`GET /api/health`.
