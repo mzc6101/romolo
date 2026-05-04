@@ -62,17 +62,20 @@ function matchesProductSet(
   return true;
 }
 
+// FIXED_AMOUNT discounts are per qualifying unit (e.g. -$0.50 per cannoli),
+// not flat per line — that's how Square applies them when an automatic
+// pricing rule with quantity thresholds fires.
 function lineDiscountAmount(
   discount: SnapshotDiscount,
-  lineSubtotalCents: number
+  line: DiscountLine
 ): number {
   if (discount.type === "FIXED_AMOUNT") {
-    const amount = discount.amountCents ?? 0;
-    return Math.min(amount, lineSubtotalCents);
+    const perUnit = discount.amountCents ?? 0;
+    return Math.min(perUnit * line.quantity, line.subtotalCents);
   }
   if (discount.type === "FIXED_PERCENTAGE") {
     const pct = discount.percentage ?? 0;
-    return Math.floor((lineSubtotalCents * pct) / 100);
+    return Math.floor((line.subtotalCents * pct) / 100);
   }
   // VARIABLE_* discounts can't be auto-applied without customer input.
   return 0;
@@ -94,49 +97,73 @@ export function computeDiscounts(
   const applied: AppliedDiscount[] = [];
   let total = 0;
 
-  for (const rule of snapshot.pricingRules) {
-    if (rule.applicationMode !== "AUTOMATIC") continue;
-    const discount = discountById.get(rule.discountId);
-    if (!discount) continue;
-
-    if (rule.discountTargetScope === "LINE_ITEM") {
+  // Per-line: pick the single matching AUTOMATIC rule that yields the largest
+  // savings. Square applies the most-favorable tier rather than stacking
+  // overlapping pricing rules, so a 12-pack of cannolis only gets the 12+
+  // discount even when the 6-11 rule's product_set also matches.
+  for (const line of lines) {
+    let bestForLine: AppliedDiscount | null = null;
+    for (const rule of snapshot.pricingRules) {
+      if (rule.applicationMode !== "AUTOMATIC") continue;
+      if (rule.discountTargetScope !== "LINE_ITEM") continue;
       if (!rule.matchProductsId) continue;
       const set = productSetById.get(rule.matchProductsId);
       if (!set) continue;
+      if (!matchesProductSet(set, line)) continue;
       const excludeSet = rule.excludeProductsId
         ? productSetById.get(rule.excludeProductsId)
         : undefined;
-
-      for (const line of lines) {
-        if (!matchesProductSet(set, line)) continue;
-        if (excludeSet && matchesProductSet(excludeSet, line)) continue;
-        const amount = lineDiscountAmount(discount, line.subtotalCents);
-        if (amount <= 0) continue;
-        applied.push({
+      if (excludeSet && matchesProductSet(excludeSet, line)) continue;
+      const discount = discountById.get(rule.discountId);
+      if (!discount) continue;
+      const amount = lineDiscountAmount(discount, line);
+      if (amount <= 0) continue;
+      if (!bestForLine || amount > bestForLine.amountCents) {
+        bestForLine = {
           ruleId: rule.id,
           discountId: discount.id,
           name: discount.name,
           amountCents: amount,
           scope: "LINE_ITEM",
           lineKey: line.lineKey,
-        });
-        total += amount;
-      }
-    } else {
-      // ORDER scope — apply once to the whole subtotal. None of the current
-      // rules use this; safe minimal handling.
-      const amount = lineDiscountAmount(discount, subtotalCents);
-      if (amount > 0) {
-        applied.push({
-          ruleId: rule.id,
-          discountId: discount.id,
-          name: discount.name,
-          amountCents: amount,
-          scope: "ORDER",
-        });
-        total += amount;
+        };
       }
     }
+    if (bestForLine) {
+      applied.push(bestForLine);
+      total += bestForLine.amountCents;
+    }
+  }
+
+  // ORDER-scope automatic rules apply once to the whole subtotal; same
+  // best-wins choice if multiple match.
+  let bestOrder: AppliedDiscount | null = null;
+  for (const rule of snapshot.pricingRules) {
+    if (rule.applicationMode !== "AUTOMATIC") continue;
+    if (rule.discountTargetScope !== "ORDER") continue;
+    const discount = discountById.get(rule.discountId);
+    if (!discount) continue;
+    const fakeOrderLine: DiscountLine = {
+      lineKey: "__order__",
+      catalogObjectId: "",
+      quantity: 1,
+      subtotalCents,
+    };
+    const amount = lineDiscountAmount(discount, fakeOrderLine);
+    if (amount <= 0) continue;
+    if (!bestOrder || amount > bestOrder.amountCents) {
+      bestOrder = {
+        ruleId: rule.id,
+        discountId: discount.id,
+        name: discount.name,
+        amountCents: amount,
+        scope: "ORDER",
+      };
+    }
+  }
+  if (bestOrder) {
+    applied.push(bestOrder);
+    total += bestOrder.amountCents;
   }
 
   const cappedTotal = Math.min(total, subtotalCents);

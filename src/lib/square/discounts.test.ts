@@ -29,8 +29,9 @@ const discountMini24: SnapshotDiscount = {
   amountCents: 50,
 };
 
-// Mirrors the Sandbox: product_set has quantity_min only, no quantity_max.
-// That means at qty>=12 BOTH tier rules fire and stack — see test below.
+// Mirrors the Sandbox: 6-11 product_set has quantity_min only (no max). The
+// engine resolves the overlap with the 12+ rule by picking the largest
+// per-line discount, not by stacking — see test below.
 const set6_11: SnapshotProductSet = {
   id: "PS6",
   productIdsAny: [FULL_SINGLE],
@@ -88,50 +89,68 @@ describe("computeDiscounts", () => {
     expect(result.applied).toEqual([]);
   });
 
-  it("applies the 6-11 tier for 6 Full Size singles", () => {
+  it("applies $0.50 per unit at the 6-11 tier (6 Full singles)", () => {
     const lines: DiscountLine[] = [
       { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 6, subtotalCents: 4200 },
     ];
     const result = computeDiscounts(lines, snapshot);
-    expect(result.discountCents).toBe(50);
-    expect(result.totalCents).toBe(4150);
+    expect(result.discountCents).toBe(300); // 6 × $0.50
+    expect(result.totalCents).toBe(3900);
     expect(result.applied).toHaveLength(1);
     expect(result.applied[0].name).toBe("Full Size 6-11");
   });
 
-  it("stacks tier discounts when product_sets overlap (mirrors Sandbox)", () => {
-    // At qty=12 both the 6-11 and 12+ rules match (6-11 set has no quantity_max
-    // in the user's Sandbox), so $0.50 + $1.00 = $1.50 is taken off the line.
+  it("applies $0.50 per unit at the 6-11 tier (11 Full singles)", () => {
+    const lines: DiscountLine[] = [
+      { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 11, subtotalCents: 7700 },
+    ];
+    const result = computeDiscounts(lines, snapshot);
+    expect(result.discountCents).toBe(550); // 11 × $0.50
+    expect(result.totalCents).toBe(7150);
+    expect(result.applied[0].name).toBe("Full Size 6-11");
+  });
+
+  it("picks the 12+ tier (not 6-11) at qty 12 — Square takes the larger discount", () => {
     const lines: DiscountLine[] = [
       { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 12, subtotalCents: 8400 },
     ];
     const result = computeDiscounts(lines, snapshot);
-    expect(result.discountCents).toBe(150);
-    expect(result.totalCents).toBe(8250);
-    expect(result.applied).toHaveLength(2);
-    expect(result.applied.map((a) => a.name).sort()).toEqual([
-      "Full Size 12+",
-      "Full Size 6-11",
-    ]);
+    expect(result.discountCents).toBe(1200); // 12 × $1.00
+    expect(result.totalCents).toBe(7200);
+    expect(result.applied).toHaveLength(1);
+    expect(result.applied[0].name).toBe("Full Size 12+");
   });
 
-  it("applies the 24+ Mini tier", () => {
+  it("applies $0.50 per unit at the 24+ Mini tier", () => {
     const lines: DiscountLine[] = [
       { lineKey: "L1", catalogObjectId: MINI_SINGLE, quantity: 24, subtotalCents: 9600 },
     ];
     const result = computeDiscounts(lines, snapshot);
-    expect(result.discountCents).toBe(50);
-    expect(result.totalCents).toBe(9550);
+    expect(result.discountCents).toBe(1200); // 24 × $0.50
+    expect(result.totalCents).toBe(8400);
   });
 
-  it("never discounts more than the subtotal", () => {
+  it("never discounts more than the line subtotal", () => {
     const lines: DiscountLine[] = [
       { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 12, subtotalCents: 50 },
     ];
     const result = computeDiscounts(lines, snapshot);
-    // discount cents would be 100 but subtotal is only 50
+    // 12 × $1.00 = $12.00 nominal, capped at the $0.50 subtotal
     expect(result.discountCents).toBe(50);
     expect(result.totalCents).toBe(0);
+  });
+
+  it("evaluates each cart line independently (mixed-quantity lines)", () => {
+    const lines: DiscountLine[] = [
+      // 5 Full Singles → no discount
+      { lineKey: "L1", catalogObjectId: FULL_SINGLE, quantity: 5, subtotalCents: 3500 },
+      // 12 Full Singles on a separate line → 12+ tier
+      { lineKey: "L2", catalogObjectId: FULL_SINGLE, quantity: 12, subtotalCents: 8400 },
+    ];
+    const result = computeDiscounts(lines, snapshot);
+    expect(result.discountCents).toBe(1200);
+    expect(result.applied).toHaveLength(1);
+    expect(result.applied[0].lineKey).toBe("L2");
   });
 
   it("ignores lines that don't match any rule's product set", () => {
