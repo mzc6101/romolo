@@ -11,6 +11,17 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN mkdir -p public
+
+# NEXT_PUBLIC_* vars must be present at build time — Next.js inlines them
+# into the client bundle. Railway passes service env vars to ARGs that are
+# declared in the Dockerfile.
+ARG NEXT_PUBLIC_SQUARE_APPLICATION_ID
+ARG NEXT_PUBLIC_SQUARE_LOCATION_ID
+ARG NEXT_PUBLIC_SQUARE_ENVIRONMENT
+ENV NEXT_PUBLIC_SQUARE_APPLICATION_ID=$NEXT_PUBLIC_SQUARE_APPLICATION_ID
+ENV NEXT_PUBLIC_SQUARE_LOCATION_ID=$NEXT_PUBLIC_SQUARE_LOCATION_ID
+ENV NEXT_PUBLIC_SQUARE_ENVIRONMENT=$NEXT_PUBLIC_SQUARE_ENVIRONMENT
+
 RUN npm run build
 
 FROM base AS runner
