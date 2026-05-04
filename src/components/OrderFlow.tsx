@@ -33,7 +33,6 @@ type Order = {
   contact: Contact;
   cardOk: boolean;
   confirmation: string;
-  idempotencyKey?: string;
 };
 
 const lineId = () => Math.random().toString(36).slice(2, 8);
@@ -103,8 +102,10 @@ export default function OrderFlow() {
 
     const pickupAt = new Date(`${order.date}T${convert12to24(order.time)}:00`).toISOString();
 
-    const idempotencyKey = order.idempotencyKey || crypto.randomUUID();
-    if (!order.idempotencyKey) setOrder({ ...order, idempotencyKey });
+    // Fresh key per attempt: Square idempotency returns the same response for
+    // the same key, so reusing it after a decline would echo the decline
+    // instead of charging a new card.
+    const idempotencyKey = crypto.randomUUID();
 
     const res = await fetch("/api/orders", {
       method: "POST",
@@ -135,7 +136,8 @@ export default function OrderFlow() {
       return;
     }
     if (result.status === "out_of_stock") {
-      setErrorBanner("One of your items just sold out. Go back and remove it to continue.");
+      setErrorBanner("One of your items just sold out. Remove it to continue.");
+      setStep(1);
       return;
     }
     setErrorBanner("Something went wrong. Please call us at (650) 574-0625.");
@@ -149,7 +151,13 @@ export default function OrderFlow() {
         order.lines.every((l) => lineValid(l, snapshot))
       );
     if (step === 2) return order.fulfillment === "pickup";
-    if (step === 3) return order.cardOk && !!order.contact.email && !!order.contact.name;
+    if (step === 3)
+      return (
+        order.cardOk &&
+        !!cardHandle &&
+        !!order.contact.email &&
+        !!order.contact.name
+      );
     return false;
   })();
 
