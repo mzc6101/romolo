@@ -11,6 +11,12 @@ import type { SnapshotItem } from "./types";
 // across Full Size / Mini Size / Kit form-factors. The frontend treats each
 // form-factor as its own item, so we split on ingest. Display names below
 // override the default "<form> <baseName>" label.
+//
+// The Square Cannoli category also contains other items (e.g. "Cannoli",
+// "Cannoli Kit (Per 6)", legacy size SKUs) that aren't part of the online
+// flow. Items in CANNOLI_CATEGORY_NAME are dropped unless they match
+// CANNOLI_ITEM_NAME exactly — i.e. the Cannoli category is opt-in.
+const CANNOLI_CATEGORY_NAME = "Cannoli";
 const CANNOLI_ITEM_NAME = "Cannoli Online";
 const CANNOLI_FORM_NAMES: Record<string, string> = {
   "Full Size": "Full Size Cannoli",
@@ -75,6 +81,13 @@ export async function getCatalog(): Promise<{
     const categoryName = categoryId
       ? categoriesById.get(categoryId)
       : undefined;
+
+    if (
+      categoryName === CANNOLI_CATEGORY_NAME &&
+      data.name !== CANNOLI_ITEM_NAME
+    ) {
+      continue;
+    }
 
     const serialized = serializeItem(
       raw,
