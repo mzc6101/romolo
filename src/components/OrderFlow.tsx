@@ -247,6 +247,7 @@ function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
 
 // ─────────── Step 1: When ───────────
 function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
+  const { snapshot } = useOrder();
   const today = new Date();
   const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
   const days = useMemo(() => {
@@ -260,18 +261,42 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isClosed = (d: Date) => d.getDay() === 1; // Mon closed
-  const dayHours = (d: Date) => {
-    if (isClosed(d)) return "Closed";
-    return d.getDay() === 0 ? "12:00pm – 4:00pm" : "11:00am – 6:00pm";
+  const dayPeriods = (d: Date) =>
+    snapshot.hours.byWeekday[d.getDay()] ?? [];
+  const isClosed = (d: Date) => dayPeriods(d).length === 0;
+  const dayHoursLabel = (d: Date) => {
+    const periods = dayPeriods(d);
+    if (periods.length === 0) return "Closed";
+    const fmt12 = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      const ampm = h >= 12 ? "pm" : "am";
+      const h12 = h % 12 || 12;
+      return `${h12}:${String(m).padStart(2, "0")}${ampm}`;
+    };
+    return periods
+      .map((p) => `${fmt12(p.openLocal)} – ${fmt12(p.closeLocal)}`)
+      .join(", ");
   };
-  const timeSlots = (d: Date | null) => {
+
+  const timeSlots = (d: Date | null): string[] => {
     if (!d) return [];
-    if (d.getDay() === 0) return ["12:00pm", "12:30pm", "1:00pm", "2:00pm", "3:00pm", "3:30pm"];
-    return [
-      "11:00am", "11:30am", "12:00pm", "12:30pm", "1:00pm",
-      "2:00pm", "3:00pm", "4:00pm", "5:00pm", "5:30pm",
-    ];
+    const periods = dayPeriods(d);
+    const slots: string[] = [];
+    const fmt12 = (h: number, m: number) => {
+      const ampm = h >= 12 ? "pm" : "am";
+      const h12 = h % 12 || 12;
+      return `${h12}:${String(m).padStart(2, "0")}${ampm}`;
+    };
+    for (const p of periods) {
+      const [sh, sm] = p.openLocal.split(":").map(Number);
+      const [eh, em] = p.closeLocal.split(":").map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      for (let t = startMin; t + 30 <= endMin; t += 30) {
+        slots.push(fmt12(Math.floor(t / 60), t % 60));
+      }
+    }
+    return slots;
   };
 
   const selectedDate = order.date ? new Date(order.date + "T00:00:00") : null;
@@ -280,7 +305,7 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
     <div>
       <StepHeader
         title="When do you want it?"
-        subtitle="We block out closed days and times you can't pick up or be delivered to."
+        subtitle="We block out closed days and times you can't pick up."
       />
 
       <h4 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-3">
@@ -297,7 +322,9 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
             <button
               key={fmtDate(d)}
               disabled={closed}
-              onClick={() => setOrder({ ...order, date: fmtDate(d), time: "", timeAvailable: true })}
+              onClick={() =>
+                setOrder({ ...order, date: fmtDate(d), time: "", timeAvailable: true })
+              }
               className={`px-2 py-3 rounded-sm text-center transition-all border ${
                 sel
                   ? "bg-romolo-charcoal text-white border-romolo-charcoal"
@@ -312,7 +339,9 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
               <div className="font-[var(--font-serif)] text-[22px] font-medium leading-none">
                 {d.getDate()}
               </div>
-              <div className="text-[10px] mt-1 opacity-70">{closed ? "Closed" : dayHours(d)}</div>
+              <div className="text-[10px] mt-1 opacity-70">
+                {closed ? "Closed" : dayHoursLabel(d)}
+              </div>
             </button>
           );
         })}
@@ -321,7 +350,7 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
       {selectedDate && !isClosed(selectedDate) && (
         <>
           <h4 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-3">
-            Pick up / delivery time
+            Pick up time
           </h4>
           <div
             className="grid gap-2"
@@ -348,8 +377,8 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
             Need a window outside our hours? Call us at{" "}
             <a href="tel:+16505740625" className="text-romolo-red underline">
               (650) 574-0625
-            </a>{" "}
-            — we&apos;ll work something out.
+            </a>
+            .
           </p>
         </>
       )}
