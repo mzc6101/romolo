@@ -20,8 +20,16 @@ export function SquareCard({
   onError?: (msg: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Keep callback refs current without re-running the mount effect.
+  useEffect(() => {
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+  }, [onReady, onError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +41,7 @@ export function SquareCard({
       if (!appId || !locationId) {
         setStatus("error");
         setErrorMsg("Square is not configured.");
-        onError?.("Square is not configured.");
+        onErrorRef.current?.("Square is not configured.");
         return;
       }
 
@@ -45,7 +53,7 @@ export function SquareCard({
       if (!window.Square) {
         setStatus("error");
         setErrorMsg("Card field couldn't load — please refresh.");
-        onError?.("Square SDK failed to load");
+        onErrorRef.current?.("Square SDK failed to load");
         return;
       }
       if (cancelled) return;
@@ -59,7 +67,7 @@ export function SquareCard({
           return;
         }
         setStatus("ready");
-        onReady?.({
+        onReadyRef.current?.({
           tokenize: async () => {
             const result = await cardInstance.tokenize();
             if (result.status === "OK") {
@@ -76,7 +84,7 @@ export function SquareCard({
         if (cancelled) return;
         setStatus("error");
         setErrorMsg(err?.message ?? "Card field error.");
-        onError?.(err?.message ?? "Card field error.");
+        onErrorRef.current?.(err?.message ?? "Card field error.");
       }
     }
 
@@ -88,7 +96,7 @@ export function SquareCard({
         cardInstance.destroy?.().catch(() => {});
       }
     };
-  }, [onReady, onError]);
+  }, []);
 
   return (
     <div>
