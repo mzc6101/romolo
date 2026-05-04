@@ -68,3 +68,31 @@ To flip to Production later: replace `SQUARE_ACCESS_TOKEN` and the two
 Catalog and inventory are revalidated every 15 minutes via Next.js
 `revalidate: 900`. Sanity-check the integration after deploy via
 `GET /api/health`.
+
+## Live Reviews (Google + Yelp)
+
+The Reviews section pulls live data from Google Places and Yelp Fusion at
+request time, cached for 15 minutes. If both APIs fail or aren't configured,
+the page falls back to the static reviews in `src/lib/data.ts` so it never
+breaks.
+
+| Variable | Used by | Source |
+|---|---|---|
+| `GOOGLE_PLACES_API_KEY` | server | Google Cloud Console → APIs & Services → Credentials (enable **Places API**) |
+| `GOOGLE_PLACE_ID` | server | Find Romolo's via the Place ID Finder, e.g. https://developers.google.com/maps/documentation/places/web-service/place-id |
+| `YELP_API_KEY` | server | https://www.yelp.com/developers/v3/manage_app (Fusion API key) |
+| `YELP_BUSINESS_ID` | server | The slug at the end of the Yelp page URL (e.g. `romolos-cannoli-san-mateo`) |
+
+Set them in Railway:
+
+```bash
+railway variables --set GOOGLE_PLACES_API_KEY=...
+railway variables --set GOOGLE_PLACE_ID=...
+railway variables --set YELP_API_KEY=...
+railway variables --set YELP_BUSINESS_ID=...
+```
+
+Notes on API limits:
+- Google Places returns up to 5 reviews per request.
+- Yelp Fusion returns up to 3 reviews and only the first ~160 characters of each (Yelp policy).
+- Both endpoints are server-side; keys are never exposed to the browser.

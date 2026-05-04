@@ -11,10 +11,12 @@ import Footer from "@/components/Footer";
 import ScrollAnimator from "@/components/ScrollAnimator";
 import { OrderProvider } from "@/components/OrderProvider";
 import OrderFlowMount from "@/components/OrderFlowMount";
+import FloatingOrderCTA from "@/components/FloatingOrderCTA";
 import { getCatalog } from "@/lib/square/catalog";
 import { getOpenPeriods } from "@/lib/square/hours";
 import { squareLocationId } from "@/lib/square/client";
 import type { MenuSnapshot } from "@/lib/square/types";
+import { getReviews } from "@/lib/reviews";
 
 // Render at request time so the build never calls Square (Railway injects
 // SQUARE_* env vars at runtime, not during `next build`). The 15-min cache
@@ -35,23 +37,44 @@ const cachedHours = unstable_cache(
   { revalidate: CACHE_SECONDS },
 );
 
-async function loadSnapshot(): Promise<MenuSnapshot> {
-  const [{ items, discounts, pricingRules, productSets }, hours] =
-    await Promise.all([cachedCatalog(), cachedHours()]);
+function emptySnapshot(): MenuSnapshot {
   return {
     fetchedAt: new Date().toISOString(),
-    locationId: squareLocationId(),
+    locationId: "",
     currency: "USD",
-    items,
-    hours,
-    discounts,
-    pricingRules,
-    productSets,
+    items: [],
+    hours: { byWeekday: {}, timezone: "America/Los_Angeles" },
+    discounts: [],
+    pricingRules: [],
+    productSets: [],
   };
 }
 
+async function loadSnapshot(): Promise<MenuSnapshot> {
+  try {
+    const [{ items, discounts, pricingRules, productSets }, hours] =
+      await Promise.all([cachedCatalog(), cachedHours()]);
+    return {
+      fetchedAt: new Date().toISOString(),
+      locationId: squareLocationId(),
+      currency: "USD",
+      items,
+      hours,
+      discounts,
+      pricingRules,
+      productSets,
+    };
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Square snapshot unavailable; rendering with empty snapshot.", err);
+      return emptySnapshot();
+    }
+    throw err;
+  }
+}
+
 export default async function Home() {
-  const snapshot = await loadSnapshot();
+  const [snapshot, reviews] = await Promise.all([loadSnapshot(), getReviews()]);
 
   return (
     <OrderProvider initialSnapshot={snapshot}>
@@ -62,11 +85,12 @@ export default async function Home() {
         <Heritage />
         <Process />
         <Menu />
-        <Testimonials />
+        <Testimonials reviews={reviews} />
         <Contact />
         <Location />
       </main>
       <Footer />
+      <FloatingOrderCTA />
       <OrderFlowMount />
     </OrderProvider>
   );
