@@ -21,6 +21,13 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
     idempotencyKey: req.idempotencyKey,
     order: {
       locationId,
+      // AUTOMATIC pricing rules (e.g. our cannoli quantity tiers) only fire
+      // on API-created orders when this opt-in is set. Without it, Square
+      // ignores the rules and charges the pre-discount total even though our
+      // UI shows the discounted total.
+      pricingOptions: {
+        autoApplyDiscounts: true,
+      },
       lineItems,
       fulfillments: [
         {

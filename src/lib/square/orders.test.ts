@@ -17,6 +17,11 @@ describe("buildOrderPayload", () => {
     ],
   };
 
+  it("opts the order in to AUTOMATIC pricing-rule discounts", () => {
+    const payload = buildOrderPayload(baseRequest, "LOC_TEST");
+    expect(payload.order.pricingOptions?.autoApplyDiscounts).toBe(true);
+  });
+
   it("builds an Order with line items, modifiers, and pickup fulfillment", () => {
     const payload = buildOrderPayload(baseRequest, "LOC_TEST");
     expect(payload.idempotencyKey).toBe("abc-123");
