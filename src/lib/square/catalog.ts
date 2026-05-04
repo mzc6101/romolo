@@ -1,11 +1,19 @@
 import "server-only";
 import { squareClient, squareLocationId } from "./client";
 import {
+  serializeDiscount,
   serializeItem,
   serializeModifierList,
+  serializePricingRule,
+  serializeProductSet,
   splitItemByFormFactor,
 } from "./serializers";
-import type { SnapshotItem } from "./types";
+import type {
+  SnapshotDiscount,
+  SnapshotItem,
+  SnapshotPricingRule,
+  SnapshotProductSet,
+} from "./types";
 
 // Square models cannoli as one item ("Cannoli Online") with 7 variations
 // across Full Size / Mini Size / Kit form-factors. The frontend treats each
@@ -26,12 +34,21 @@ const CANNOLI_FORM_NAMES: Record<string, string> = {
 
 export async function getCatalog(): Promise<{
   items: SnapshotItem[];
+  discounts: SnapshotDiscount[];
+  pricingRules: SnapshotPricingRule[];
+  productSets: SnapshotProductSet[];
 }> {
   const client = squareClient();
   const locationId = squareLocationId();
 
   const search = await client.catalog.search({
-    objectTypes: ["ITEM", "CATEGORY"],
+    objectTypes: [
+      "ITEM",
+      "CATEGORY",
+      "DISCOUNT",
+      "PRICING_RULE",
+      "PRODUCT_SET",
+    ],
     includeRelatedObjects: true,
   });
 
@@ -102,5 +119,15 @@ export async function getCatalog(): Promise<{
     }
   }
 
-  return { items };
+  const discounts = allObjects
+    .filter((o) => o.type === "DISCOUNT")
+    .map(serializeDiscount);
+  const pricingRules = allObjects
+    .filter((o) => o.type === "PRICING_RULE")
+    .map(serializePricingRule);
+  const productSets = allObjects
+    .filter((o) => o.type === "PRODUCT_SET")
+    .map(serializeProductSet);
+
+  return { items, discounts, pricingRules, productSets };
 }

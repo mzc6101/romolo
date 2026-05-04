@@ -36,16 +36,17 @@ const cachedHours = unstable_cache(
 );
 
 async function loadSnapshot(): Promise<MenuSnapshot> {
-  const [{ items }, hours] = await Promise.all([
-    cachedCatalog(),
-    cachedHours(),
-  ]);
+  const [{ items, discounts, pricingRules, productSets }, hours] =
+    await Promise.all([cachedCatalog(), cachedHours()]);
   return {
     fetchedAt: new Date().toISOString(),
     locationId: squareLocationId(),
     currency: "USD",
     items,
     hours,
+    discounts,
+    pricingRules,
+    productSets,
   };
 }
 

@@ -4,6 +4,43 @@ export type MenuSnapshot = {
   currency: "USD";
   items: SnapshotItem[];
   hours: OpenPeriods;
+  discounts: SnapshotDiscount[];
+  pricingRules: SnapshotPricingRule[];
+  productSets: SnapshotProductSet[];
+};
+
+export type SnapshotDiscount = {
+  id: string;
+  name: string;
+  type: "FIXED_AMOUNT" | "FIXED_PERCENTAGE" | "VARIABLE_AMOUNT" | "VARIABLE_PERCENTAGE";
+  // Set when type === "FIXED_AMOUNT"
+  amountCents?: number;
+  // Set when type === "FIXED_PERCENTAGE" — Square stores it as a string
+  // ("10.0" = 10%); we normalize to a number.
+  percentage?: number;
+};
+
+export type SnapshotProductSet = {
+  id: string;
+  productIdsAny?: string[];
+  productIdsAll?: string[];
+  allProducts?: boolean;
+  quantityMin?: number;
+  quantityMax?: number;
+  quantityExact?: number;
+};
+
+export type SnapshotPricingRule = {
+  id: string;
+  discountId: string;
+  matchProductsId?: string;
+  excludeProductsId?: string;
+  applicationMode: "AUTOMATIC" | "MANUAL";
+  discountTargetScope: "LINE_ITEM" | "ORDER";
+  validFromDate?: string;
+  validUntilDate?: string;
+  validFromLocalTime?: string;
+  validUntilLocalTime?: string;
 };
 
 export type SnapshotItem = {

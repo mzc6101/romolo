@@ -1,9 +1,57 @@
 import type {
+  SnapshotDiscount,
   SnapshotItem,
   SnapshotModifierList,
   SnapshotModifier,
+  SnapshotPricingRule,
+  SnapshotProductSet,
   SnapshotVariation,
 } from "./types";
+
+export function serializeDiscount(raw: any): SnapshotDiscount {
+  const data = raw.discountData ?? {};
+  const type = data.discountType ?? "FIXED_AMOUNT";
+  const amount = data.amountMoney?.amount;
+  const pct = data.percentage;
+  return {
+    id: raw.id,
+    name: data.name ?? "",
+    type,
+    amountCents: amount != null ? Number(amount) : undefined,
+    percentage: pct != null && pct !== "" ? Number(pct) : undefined,
+  };
+}
+
+export function serializeProductSet(raw: any): SnapshotProductSet {
+  const data = raw.productSetData ?? {};
+  return {
+    id: raw.id,
+    productIdsAny: data.productIdsAny ?? undefined,
+    productIdsAll: data.productIdsAll ?? undefined,
+    allProducts: data.allProducts === true ? true : undefined,
+    quantityMin: data.quantityMin != null ? Number(data.quantityMin) : undefined,
+    quantityMax: data.quantityMax != null ? Number(data.quantityMax) : undefined,
+    quantityExact: data.quantityExact != null ? Number(data.quantityExact) : undefined,
+  };
+}
+
+export function serializePricingRule(raw: any): SnapshotPricingRule {
+  const data = raw.pricingRuleData ?? {};
+  return {
+    id: raw.id,
+    discountId: data.discountId,
+    matchProductsId: data.matchProductsId ?? undefined,
+    excludeProductsId: data.excludeProductsId ?? undefined,
+    applicationMode:
+      data.applicationMode === "MANUAL" ? "MANUAL" : "AUTOMATIC",
+    discountTargetScope:
+      data.discountTargetScope === "ORDER" ? "ORDER" : "LINE_ITEM",
+    validFromDate: data.validFromDate ?? undefined,
+    validUntilDate: data.validUntilDate ?? undefined,
+    validFromLocalTime: data.validFromLocalTime ?? undefined,
+    validUntilLocalTime: data.validUntilLocalTime ?? undefined,
+  };
+}
 
 // Splits a Square item whose variations follow "<form-factor> - <size>" naming
 // (e.g. "Cannoli Online" with Full Size/Mini Size/Kit variations) into one

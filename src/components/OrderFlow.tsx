@@ -13,6 +13,7 @@ import { VariationPicker } from "./order/VariationPicker";
 import { ModifierSet } from "./order/ModifierSet";
 import { SquareCard, type SquareCardHandle } from "./order/SquareCard";
 import type { MenuSnapshot } from "@/lib/square/types";
+import { computeDiscounts, type DiscountLine } from "@/lib/square/discounts";
 
 type Contact = { name: string; phone: string; email: string };
 
@@ -875,28 +876,68 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
 }
 
 function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapshot }) {
-  const subtotalCents = order.lines.reduce((sum, l) => {
+  const discountLines: DiscountLine[] = [];
+  for (const l of order.lines) {
     const item = snapshot.items.find((i) => i.id === l.itemId);
-    if (!item) return sum;
+    if (!item) continue;
     const variation = item.variations.find((v) => v.id === l.variationId);
-    if (!variation) return sum;
-    let lineCents = variation.priceCents;
+    if (!variation) continue;
+    let unitCents = variation.priceCents;
     for (const ml of item.modifierLists) {
       const selected = l.modifiers[ml.id] ?? [];
       for (const modId of selected) {
         const mod = ml.modifiers.find((m) => m.id === modId);
-        if (mod) lineCents += mod.priceCents;
+        if (mod) unitCents += mod.priceCents;
       }
     }
-    return sum + lineCents * l.qty;
-  }, 0);
+    discountLines.push({
+      lineKey: l.id,
+      catalogObjectId: l.variationId,
+      quantity: l.qty,
+      subtotalCents: unitCents * l.qty,
+    });
+  }
+
+  const { subtotalCents, discountCents, totalCents, applied } =
+    computeDiscounts(discountLines, snapshot);
+
+  // Aggregate applied discounts by name for compact display
+  const discountByName = new Map<string, number>();
+  for (const a of applied) {
+    discountByName.set(a.name, (discountByName.get(a.name) ?? 0) + a.amountCents);
+  }
 
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
-      <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>
-      <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal">
-        {fmtCents(subtotalCents)}
-      </div>
+      {discountCents > 0 ? (
+        <>
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <span>Subtotal</span>
+            <span className="tabular-nums">{fmtCents(subtotalCents)}</span>
+          </div>
+          {[...discountByName.entries()].map(([name, amount]) => (
+            <div
+              key={name}
+              className="flex items-baseline justify-between gap-3 text-[11px] text-romolo-red"
+              title={name}
+            >
+              <span className="truncate max-w-[180px]">{name}</span>
+              <span className="tabular-nums">−{fmtCents(amount)}</span>
+            </div>
+          ))}
+          <div className="text-[11px] tracking-[0.15em] uppercase mt-1">Total</div>
+          <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal leading-none">
+            {fmtCents(totalCents)}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>
+          <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal">
+            {fmtCents(totalCents)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
