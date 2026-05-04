@@ -5,7 +5,8 @@
  * `DELIVERY_ZONES`, `REVIEWS`, `fmt`) for parts of the homepage that still
  * reference them — see Menu.tsx, Testimonials.tsx — and for re-use when
  * Cannoli ordering is wired in. Do not add new menu items here. Live order
- * data comes from `getMenuSnapshot()` in `lib/square/catalog.ts`.
+ * data comes from `loadSnapshot()` in `app/page.tsx`, which calls
+ * `getCatalog()` and `getOpenPeriods()` from `lib/square/`.
  */
 
 export type MenuItem = {
