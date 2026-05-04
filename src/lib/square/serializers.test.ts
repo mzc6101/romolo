@@ -79,6 +79,18 @@ describe("serializeModifierList", () => {
     expect(result.maxSelected).toBe(null);
     expect(result.modifiers[0].priceCents).toBe(50);
   });
+
+  it("returns empty modifiers array when the source has none", () => {
+    const result = serializeModifierList({
+      type: "MODIFIER_LIST",
+      id: "ML3",
+      modifierListData: {
+        name: "Empty",
+        selectionType: "SINGLE",
+      },
+    } as any);
+    expect(result.modifiers).toEqual([]);
+  });
 });
 
 describe("serializeItem", () => {
@@ -181,5 +193,78 @@ describe("serializeItem", () => {
       V3: 5,
     });
     expect(result.variations[0].inStock).toBe(true);
+  });
+
+  it("returns empty variations array when the source has none", () => {
+    const itemNoVars = {
+      type: "ITEM",
+      id: "I_NOVAR",
+      itemData: { name: "Empty Item" },
+    } as any;
+    const result = serializeItem(itemNoVars, "Misc", [], {});
+    expect(result.variations).toEqual([]);
+  });
+
+  it("defaults price to 0 cents when priceMoney is missing", () => {
+    const item = {
+      type: "ITEM",
+      id: "I_NOPRICE",
+      itemData: {
+        name: "Free Sample",
+        variations: [
+          {
+            type: "ITEM_VARIATION",
+            id: "V_NOPRICE",
+            itemVariationData: { name: "Default" },
+          },
+        ],
+      },
+    } as any;
+    const result = serializeItem(item, "Sample", [], {});
+    expect(result.variations[0].priceCents).toBe(0);
+  });
+
+  it("drops a modifier list whose modifierListInfo is disabled", () => {
+    const item = {
+      type: "ITEM",
+      id: "I_DISABLED",
+      itemData: {
+        name: "Cookies",
+        variations: [
+          {
+            type: "ITEM_VARIATION",
+            id: "V_X",
+            itemVariationData: {
+              name: "Regular",
+              priceMoney: { amount: BigInt(100), currency: "USD" },
+            },
+          },
+        ],
+        modifierListInfo: [
+          { modifierListId: "ML_ON", enabled: true },
+          { modifierListId: "ML_OFF", enabled: false },
+        ],
+      },
+    } as any;
+    const allLists = [
+      {
+        id: "ML_ON",
+        name: "On",
+        selectionType: "SINGLE" as const,
+        minSelected: 1,
+        maxSelected: 1,
+        modifiers: [],
+      },
+      {
+        id: "ML_OFF",
+        name: "Off",
+        selectionType: "SINGLE" as const,
+        minSelected: 1,
+        maxSelected: 1,
+        modifiers: [],
+      },
+    ];
+    const result = serializeItem(item, "Cookie", allLists, {});
+    expect(result.modifierLists.map((m) => m.id)).toEqual(["ML_ON"]);
   });
 });
