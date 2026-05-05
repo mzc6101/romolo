@@ -1,18 +1,22 @@
 "use client";
 
-// NOTE: This file previously contained Cannoli-specific UI (flavor mix, kit shells,
-// "you decide", delivery zones, Sunday surcharge). That code has been removed in
-// favor of generic Square-driven rendering. When wiring Cannoli back in, restore
-// those flows from git history (commit predating Square integration) — they will
-// need to be re-shaped against snapshot.modifierLists for "Cannoli Filling",
-// "Cannoli Toppings", etc.
+// Cannoli is rendered as a single composite item in the dropdown ("Cannoli")
+// even though Square has Ice Cream and Ricotta as two separate items. The
+// frontend filling-type picker switches between them; the active filling
+// supplies its own variations + modifier lists. See `mergeCannoliItems` in
+// src/lib/square/serializers.ts for how the composite is built.
 
 import { useEffect, useMemo, useState } from "react";
 import { useOrder } from "./OrderProvider";
 import { VariationPicker } from "./order/VariationPicker";
 import { ModifierSet } from "./order/ModifierSet";
 import { SquareCard, type SquareCardHandle } from "./order/SquareCard";
-import type { MenuSnapshot } from "@/lib/square/types";
+import type {
+  MenuSnapshot,
+  SnapshotItem,
+  SnapshotModifierList,
+  SnapshotVariation,
+} from "@/lib/square/types";
 import { computeDiscounts, type DiscountLine } from "@/lib/square/discounts";
 
 type Contact = { name: string; phone: string; email: string };
@@ -20,11 +24,40 @@ type Contact = { name: string; phone: string; email: string };
 type OrderLine = {
   id: string;
   itemId: string;       // SnapshotItem.id
+  // Composite-item lines (e.g. Cannoli) carry the picked filling-type key —
+  // determines which underlying Square item supplies the variations + mods.
+  fillingKey?: string;
   variationId: string;  // SnapshotVariation.id
   qty: number;
   modifiers: Record<string, string[]>; // modifierListId -> selected modifier ids
   freeText: Record<string, string>;    // modifierListId (TEXT) -> entered text
 };
+
+function activeVariations(
+  item: SnapshotItem,
+  fillingKey: string | undefined
+): SnapshotVariation[] {
+  if (item.cannoliFillings) {
+    const f = item.cannoliFillings.find((x) => x.key === fillingKey);
+    return f?.variations ?? [];
+  }
+  return item.variations;
+}
+
+function activeModifierLists(
+  item: SnapshotItem,
+  fillingKey: string | undefined
+): SnapshotModifierList[] {
+  if (item.cannoliFillings) {
+    const f = item.cannoliFillings.find((x) => x.key === fillingKey);
+    return f?.modifierLists ?? [];
+  }
+  return item.modifierLists;
+}
+
+// Composite items (Cannoli) start with no filling selected — the user must
+// pick one before sizes/modifiers render. Non-composite items have no filling
+// concept so fillingKey stays undefined for the lifetime of the line.
 
 type Order = {
   date: string;
@@ -42,10 +75,10 @@ const lineId = () => Math.random().toString(36).slice(2, 8);
 // Seed defaults for a fresh OrderLine: leaves required SINGLE-list selections
 // empty (user must pick) so the "required" enforcement works, but pre-fills
 // nothing for optional / TEXT / MULTIPLE lists.
-function seedSelectionsForItem(item: { modifierLists: import("@/lib/square/types").SnapshotModifierList[] }) {
+function seedSelectionsForLists(modifierLists: SnapshotModifierList[]) {
   const modifiers: Record<string, string[]> = {};
   const freeText: Record<string, string> = {};
-  for (const ml of item.modifierLists) {
+  for (const ml of modifierLists) {
     if (ml.modifierType === "text") {
       freeText[ml.id] = "";
     } else {
@@ -71,9 +104,12 @@ const fmtCents = (c: number) => "$" + (c / 100).toFixed(2);
 const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
   const item = snapshot.items.find((i) => i.id === line.itemId);
   if (!item) return false;
-  const variation = item.variations.find((v) => v.id === line.variationId);
+  if (item.cannoliFillings && !line.fillingKey) return false;
+  const variations = activeVariations(item, line.fillingKey);
+  const modifierLists = activeModifierLists(item, line.fillingKey);
+  const variation = variations.find((v) => v.id === line.variationId);
   if (!variation || !variation.inStock) return false;
-  for (const ml of item.modifierLists) {
+  for (const ml of modifierLists) {
     if (ml.modifierType === "text") {
       const text = (line.freeText[ml.id] ?? "").trim();
       if (ml.minSelected > 0 && text.length === 0) return false;
@@ -143,7 +179,7 @@ export default function OrderFlow() {
           const item = snapshot.items.find((i) => i.id === l.itemId);
           const noteParts: string[] = [];
           if (item) {
-            for (const ml of item.modifierLists) {
+            for (const ml of activeModifierLists(item, l.fillingKey)) {
               if (ml.modifierType !== "text") continue;
               const text = (l.freeText[ml.id] ?? "").trim();
               if (text.length === 0) continue;
@@ -518,9 +554,16 @@ function StepWhat({
   const addLine = () => {
     const firstItem = snapshot.items[0];
     if (!firstItem) return;
-    const firstVariation = firstItem.variations.find((v) => v.inStock) ?? firstItem.variations[0];
+    const isComposite = !!firstItem.cannoliFillings;
+    // Composite: filling/size both stay unselected until the user picks them.
+    // Non-composite: keep historical behavior — preselect first in-stock variation.
+    const variations = isComposite ? [] : firstItem.variations;
+    const modifierLists = isComposite ? [] : firstItem.modifierLists;
+    const firstVariation = isComposite
+      ? undefined
+      : variations.find((v) => v.inStock) ?? variations[0];
     const { modifiers: seedModifiers, freeText: seedFreeText } =
-      seedSelectionsForItem(firstItem);
+      seedSelectionsForLists(modifierLists);
     setOrder({
       ...order,
       lines: [
@@ -528,6 +571,7 @@ function StepWhat({
         {
           id: lineId(),
           itemId: firstItem.id,
+          fillingKey: undefined,
           variationId: firstVariation?.id ?? "",
           qty: 1,
           modifiers: seedModifiers,
@@ -583,17 +627,41 @@ function OrderLineEditor({
   const { snapshot } = useOrder();
   const item = snapshot.items.find((i) => i.id === line.itemId);
   if (!item) return null;
+  const variations = activeVariations(item, line.fillingKey);
+  const modifierLists = activeModifierLists(item, line.fillingKey);
 
   const onItemChange = (id: string) => {
     const next = snapshot.items.find((i) => i.id === id);
     if (!next) return;
-    const firstVariation = next.variations.find((v) => v.inStock) ?? next.variations[0];
+    const isComposite = !!next.cannoliFillings;
+    const nextVariations = isComposite ? [] : next.variations;
+    const nextLists = isComposite ? [] : next.modifierLists;
+    const firstVariation = isComposite
+      ? undefined
+      : nextVariations.find((v) => v.inStock) ?? nextVariations[0];
     const { modifiers: seedModifiers, freeText: seedFreeText } =
-      seedSelectionsForItem(next);
+      seedSelectionsForLists(nextLists);
     onChange({
       itemId: id,
+      fillingKey: undefined,
       variationId: firstVariation?.id ?? "",
       qty: 1,
+      modifiers: seedModifiers,
+      freeText: seedFreeText,
+    });
+  };
+
+  const onFillingChange = (key: string) => {
+    if (!item.cannoliFillings) return;
+    const filling = item.cannoliFillings.find((f) => f.key === key);
+    if (!filling) return;
+    // Size stays unselected — user picks it explicitly. Modifier lists are
+    // seeded so required SINGLE-select lists block "Continue" until chosen.
+    const { modifiers: seedModifiers, freeText: seedFreeText } =
+      seedSelectionsForLists(filling.modifierLists);
+    onChange({
+      fillingKey: key,
+      variationId: "",
       modifiers: seedModifiers,
       freeText: seedFreeText,
     });
@@ -642,15 +710,42 @@ function OrderLineEditor({
         <div className="text-[13px] text-romolo-warm-gray mb-3">{item.description}</div>
       )}
 
-      {item.variations.length > 1 && (
+      {item.cannoliFillings && (
+        <div className="mb-4">
+          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+            Filling
+          </h5>
+          <div className="flex flex-wrap gap-2">
+            {item.cannoliFillings.map((f) => {
+              const sel = f.key === line.fillingKey;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => onFillingChange(f.key)}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    sel
+                      ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                      : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {variations.length > 1 && (
         <VariationPicker
-          variations={item.variations}
+          variations={variations}
           selectedId={line.variationId}
           onSelect={(id) => onChange({ variationId: id })}
         />
       )}
 
-      {item.modifierLists.map((ml) => (
+      {modifierLists.map((ml) => (
         <ModifierSet
           key={ml.id}
           list={ml}
@@ -880,10 +975,12 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
   for (const l of order.lines) {
     const item = snapshot.items.find((i) => i.id === l.itemId);
     if (!item) continue;
-    const variation = item.variations.find((v) => v.id === l.variationId);
+    const variations = activeVariations(item, l.fillingKey);
+    const modifierLists = activeModifierLists(item, l.fillingKey);
+    const variation = variations.find((v) => v.id === l.variationId);
     if (!variation) continue;
     let unitCents = variation.priceCents;
-    for (const ml of item.modifierLists) {
+    for (const ml of modifierLists) {
       const selected = l.modifiers[ml.id] ?? [];
       for (const modId of selected) {
         const mod = ml.modifiers.find((m) => m.id === modId);

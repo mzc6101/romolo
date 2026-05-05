@@ -50,6 +50,21 @@ export type SnapshotItem = {
   categoryName?: string;
   variations: SnapshotVariation[];
   modifierLists: SnapshotModifierList[];
+  // Composite-only. When set, the frontend renders a filling-type chip picker
+  // and the active filling supplies its own variations + modifier lists. The
+  // top-level variations/modifierLists arrays are empty in that case.
+  cannoliFillings?: CannoliFilling[];
+};
+
+// One filling-type branch under the composite "Cannoli" item. `squareItemId`
+// is the underlying Square ITEM the variations + modifiers come from; we keep
+// it for traceability but order submission uses the variation id directly.
+export type CannoliFilling = {
+  key: string;          // stable e.g. "ice_cream", "ricotta"
+  label: string;        // user-facing e.g. "Ice Cream", "Ricotta"
+  squareItemId: string;
+  variations: SnapshotVariation[];
+  modifierLists: SnapshotModifierList[];
 };
 
 export type SnapshotVariation = {

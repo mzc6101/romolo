@@ -1,29 +1,12 @@
-import "server-only";
-import { squareClient, squareLocationId } from "./client";
+// Replicates the catalog code path without importing the server-only guarded module.
+import { SquareClient, SquareEnvironment } from "square";
 import {
   mergeCannoliItems,
-  serializeDiscount,
   serializeItem,
   serializeModifierList,
-  serializePricingRule,
-  serializeProductSet,
-} from "./serializers";
-import type {
-  SnapshotDiscount,
-  SnapshotItem,
-  SnapshotPricingRule,
-  SnapshotProductSet,
-} from "./types";
+} from "../src/lib/square/serializers";
+import type { SnapshotItem } from "../src/lib/square/types";
 
-// Square now models cannoli as three separate items so each filling type can
-// own its own modifier lists (Square modifier lists don't scope to specific
-// variations). The frontend re-merges Ice Cream + Ricotta back into one
-// composite "Cannoli" item with a filling-type picker — see mergeCannoliItems.
-//
-// The Square Cannoli category also contains legacy items ("Cannoli",
-// "Cannoli Kit (Per 6)", etc.) that aren't part of the online flow. Items in
-// CANNOLI_CATEGORY_NAME are dropped unless their name is in
-// CANNOLI_ALLOWED_NAMES — i.e. the Cannoli category is opt-in.
 const CANNOLI_CATEGORY_NAME = "Cannoli";
 const CANNOLI_ICE_CREAM_NAME = "Cannoli Online - Ice Cream";
 const CANNOLI_RICOTTA_NAME = "Cannoli Online - Ricotta";
@@ -37,14 +20,15 @@ const CANNOLI_COMPOSITE_NAME = "Cannoli";
 const CANNOLI_COMPOSITE_ID = "cannoli__composite";
 const CANNOLI_KIT_DISPLAY_NAME = "Cannoli Kit";
 
-export async function getCatalog(): Promise<{
-  items: SnapshotItem[];
-  discounts: SnapshotDiscount[];
-  pricingRules: SnapshotPricingRule[];
-  productSets: SnapshotProductSet[];
-}> {
-  const client = squareClient();
-  const locationId = squareLocationId();
+async function main() {
+  const token = process.env.SQUARE_ACCESS_TOKEN!;
+  const envName = process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT;
+  const locationId = process.env.SQUARE_LOCATION_ID!;
+  const environment =
+    envName === "production"
+      ? SquareEnvironment.Production
+      : SquareEnvironment.Sandbox;
+  const client = new SquareClient({ token, environment });
 
   const search = await client.catalog.search({
     objectTypes: [
@@ -56,34 +40,27 @@ export async function getCatalog(): Promise<{
     ],
     includeRelatedObjects: true,
   });
-
   const objects = search.objects ?? [];
   const related = search.relatedObjects ?? [];
-
   const allObjects = [...objects, ...related];
+
   const categoriesById = new Map<string, string>();
   for (const o of allObjects) {
     if (o.type === "CATEGORY") {
       categoriesById.set(o.id!, (o as any).categoryData?.name ?? "");
     }
   }
-
-  const modifierListsRaw = allObjects.filter(
-    (o) => o.type === "MODIFIER_LIST"
-  );
-  const allModifierLists = modifierListsRaw.map(serializeModifierList);
+  const allModifierLists = allObjects
+    .filter((o) => o.type === "MODIFIER_LIST")
+    .map(serializeModifierList);
 
   const itemObjects = objects.filter((o) => o.type === "ITEM");
-
   const variationIds = itemObjects.flatMap(
     (i: any) =>
       (i.itemData?.variations ?? []).map((v: any) => v.id) as string[]
   );
-
   const stockByVariationId: Record<string, number> = {};
   if (variationIds.length > 0) {
-    // batchGetCounts returns a Page<InventoryCount>; first page is exposed as `.data`.
-    // For our small catalog (~10s of variations) one page is plenty.
     const page = await client.inventory.batchGetCounts({
       catalogObjectIds: variationIds,
       locationIds: [locationId],
@@ -103,20 +80,19 @@ export async function getCatalog(): Promise<{
     const categoryName = categoryId
       ? categoriesById.get(categoryId)
       : undefined;
-
-    if (
+    const skip =
       categoryName === CANNOLI_CATEGORY_NAME &&
-      !CANNOLI_ALLOWED_NAMES.has(data.name)
-    ) {
-      continue;
-    }
-
+      !CANNOLI_ALLOWED_NAMES.has(data.name);
+    console.log(
+      `[ingest] "${data.name}"  category=${categoryName ?? "-"}  ${skip ? "SKIP" : "KEEP"}`
+    );
+    if (skip) continue;
     items.push(
       serializeItem(raw, categoryName, allModifierLists, stockByVariationId)
     );
   }
 
-  const mergedItems = mergeCannoliItems(items, {
+  const merged = mergeCannoliItems(items, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,
     ricottaItemName: CANNOLI_RICOTTA_NAME,
     kitItemName: CANNOLI_KIT_NAME,
@@ -125,15 +101,33 @@ export async function getCatalog(): Promise<{
     compositeId: CANNOLI_COMPOSITE_ID,
   });
 
-  const discounts = allObjects
-    .filter((o) => o.type === "DISCOUNT")
-    .map(serializeDiscount);
-  const pricingRules = allObjects
-    .filter((o) => o.type === "PRICING_RULE")
-    .map(serializePricingRule);
-  const productSets = allObjects
-    .filter((o) => o.type === "PRODUCT_SET")
-    .map(serializeProductSet);
-
-  return { items: mergedItems, discounts, pricingRules, productSets };
+  console.log(`\n== After merge: ${merged.length} items ==\n`);
+  for (const i of merged) {
+    console.log(`- "${i.name}"  (id: ${i.id})`);
+    if (i.cannoliFillings) {
+      for (const f of i.cannoliFillings) {
+        console.log(
+          `    filling: ${f.label}  (squareItemId: ${f.squareItemId})`
+        );
+        console.log(
+          `      variations: ${f.variations.map((v) => `${v.name} ($${(v.priceCents / 100).toFixed(2)})`).join(", ")}`
+        );
+        console.log(
+          `      modifier lists: ${f.modifierLists.map((m) => m.name).join(", ")}`
+        );
+      }
+    } else {
+      console.log(
+        `    variations: ${i.variations.map((v) => `${v.name} ($${(v.priceCents / 100).toFixed(2)})`).join(", ")}`
+      );
+      console.log(
+        `    modifier lists: ${i.modifierLists.map((m) => m.name).join(", ")}`
+      );
+    }
+  }
 }
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

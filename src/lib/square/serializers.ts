@@ -53,46 +53,73 @@ export function serializePricingRule(raw: any): SnapshotPricingRule {
   };
 }
 
-// Splits a Square item whose variations follow "<form-factor> - <size>" naming
-// (e.g. "Cannoli Online" with Full Size/Mini Size/Kit variations) into one
-// SnapshotItem per form-factor. Variation IDs are preserved so they still
-// resolve as catalog_object_id at order time. Variation names are trimmed to
-// the size portion only ("Set of 6", "Single", etc.).
+// Merges Square's two filling-type Cannoli items ("Cannoli Online - Ice Cream",
+// "Cannoli Online - Ricotta") into a single composite frontend item ("Cannoli")
+// with a `cannoliFillings` payload, and renames "Cannoli Online - Kit" to its
+// display name. Square models filling type as separate items because modifier
+// lists can't be scoped to specific variations — so the merge happens here on
+// the frontend instead. Returns items in their original order; the composite
+// takes the position of whichever underlying filling appears first.
 //
-// `nameOverrides` lets callers map a form-factor to a custom display name —
-// e.g. { "Kit": "Cannoli Kit" } — falling back to "<form> <baseName>".
-// Returns the original item unchanged if no variation parses.
-export function splitItemByFormFactor(
-  item: SnapshotItem,
-  nameOverrides?: Record<string, string>
-): SnapshotItem[] {
-  const order: string[] = [];
-  const groups = new Map<string, SnapshotVariation[]>();
-  let unparsed = false;
-  for (const v of item.variations) {
-    const m = v.name.match(/^\s*(.+?)\s+-\s+(.+?)\s*$/);
-    if (!m) {
-      unparsed = true;
-      break;
-    }
-    const form = m[1];
-    const size = m[2];
-    if (!groups.has(form)) {
-      groups.set(form, []);
-      order.push(form);
-    }
-    groups.get(form)!.push({ ...v, name: size });
+// If only one of Ice Cream / Ricotta exists, no composite is produced — that
+// filling stays as a normal item. Items not matching any of the three names
+// pass through untouched.
+export function mergeCannoliItems(
+  items: SnapshotItem[],
+  options: {
+    iceCreamItemName: string;
+    ricottaItemName: string;
+    kitItemName: string;
+    kitDisplayName: string;
+    compositeName: string;
+    compositeId: string;
   }
-  if (unparsed || groups.size === 0) return [item];
+): SnapshotItem[] {
+  const iceCream = items.find((i) => i.name === options.iceCreamItemName);
+  const ricotta = items.find((i) => i.name === options.ricottaItemName);
+  const kit = items.find((i) => i.name === options.kitItemName);
+  const compositePossible = !!iceCream && !!ricotta;
+  let compositeEmitted = false;
 
-  return order.map((form) => ({
-    id: `${item.id}__${form.replace(/\s+/g, "_").toLowerCase()}`,
-    name: nameOverrides?.[form] ?? `${form} ${item.name}`,
-    description: item.description,
-    categoryName: item.categoryName,
-    variations: groups.get(form)!,
-    modifierLists: item.modifierLists,
-  }));
+  const result: SnapshotItem[] = [];
+  for (const item of items) {
+    if (compositePossible && (item === iceCream || item === ricotta)) {
+      if (!compositeEmitted) {
+        result.push({
+          id: options.compositeId,
+          name: options.compositeName,
+          description: undefined,
+          categoryName: iceCream!.categoryName ?? ricotta!.categoryName,
+          variations: [],
+          modifierLists: [],
+          cannoliFillings: [
+            {
+              key: "ice_cream",
+              label: "Ice Cream",
+              squareItemId: iceCream!.id,
+              variations: iceCream!.variations,
+              modifierLists: iceCream!.modifierLists,
+            },
+            {
+              key: "ricotta",
+              label: "Ricotta",
+              squareItemId: ricotta!.id,
+              variations: ricotta!.variations,
+              modifierLists: ricotta!.modifierLists,
+            },
+          ],
+        });
+        compositeEmitted = true;
+      }
+      continue;
+    }
+    if (kit && item === kit) {
+      result.push({ ...kit, name: options.kitDisplayName });
+      continue;
+    }
+    result.push(item);
+  }
+  return result;
 }
 
 export function serializeModifier(raw: any): SnapshotModifier {

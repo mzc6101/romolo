@@ -25,15 +25,18 @@ export const dynamic = "force-dynamic";
 
 const CACHE_SECONDS = 900;
 
+// Bump the trailing version segment whenever the snapshot shape changes —
+// it abandons the prior cached entry so deploys don't serve stale snapshots
+// to a freshly deployed page (and to a dev server that's seen old data).
 const cachedCatalog = unstable_cache(
   async () => getCatalog(),
-  ["square-catalog"],
+  ["square-catalog", "v2"],
   { revalidate: CACHE_SECONDS },
 );
 
 const cachedHours = unstable_cache(
   async () => getOpenPeriods(),
-  ["square-hours"],
+  ["square-hours", "v2"],
   { revalidate: CACHE_SECONDS },
 );
 
