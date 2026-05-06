@@ -82,7 +82,7 @@ describe("buildOrderPayload", () => {
     expect((payload.order.lineItems![0] as any).note).toBeUndefined();
   });
 
-  it("appends a kit modifier with overridden price + quantity for kit lines", () => {
+  it("emits a sibling ad-hoc Cannoli Kit line right after a kit-bearing cannoli line", () => {
     const payload = buildOrderPayload(
       {
         ...baseRequest,
@@ -91,24 +91,31 @@ describe("buildOrderPayload", () => {
             catalogObjectId: "VAR_RIC_FULL",
             quantity: 12,
             modifiers: ["MOD_SHELL_TOFFEE"],
-            kitModifier: {
-              modifierId: "MOD_KIT",
-              perKitFeeCents: 200,
-              count: 2,
-            },
+            kitModifier: { perKitFeeCents: 200, count: 2 },
+          },
+          {
+            catalogObjectId: "VAR_COOKIES",
+            quantity: 1,
+            modifiers: [],
           },
         ],
       },
       "LOC_TEST"
     );
-    const line = payload.order.lineItems![0] as any;
-    expect(line.quantity).toBe("12");
-    expect(line.modifiers).toEqual([
-      { catalogObjectId: "MOD_SHELL_TOFFEE" },
+    expect(payload.order.lineItems).toEqual([
       {
-        catalogObjectId: "MOD_KIT",
-        basePriceMoney: { amount: BigInt(200), currency: "USD" },
+        catalogObjectId: "VAR_RIC_FULL",
+        quantity: "12",
+        modifiers: [{ catalogObjectId: "MOD_SHELL_TOFFEE" }],
+      },
+      {
+        name: "Cannoli Kit",
         quantity: "2",
+        basePriceMoney: { amount: BigInt(200), currency: "USD" },
+      },
+      {
+        catalogObjectId: "VAR_COOKIES",
+        quantity: "1",
       },
     ]);
   });

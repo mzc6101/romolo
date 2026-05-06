@@ -214,7 +214,6 @@ export default function OrderFlow() {
           const kitModifier =
             item?.kit
               ? {
-                  modifierId: item.kit.modifierId,
                   perKitFeeCents: item.kit.perKitFeeCents,
                   count: Math.floor(l.qty / item.kit.groupSize),
                 }

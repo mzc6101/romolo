@@ -94,11 +94,15 @@ export function mergeCannoliItems(
   for (const item of items) {
     if (compositePossible && (item === iceCream || item === ricotta)) {
       if (!compositeEmitted) {
-        const kitInfo = resolveKitInfo(iceCream!, ricotta!, options);
         result.push(buildRegularComposite(iceCream!, ricotta!, options));
-        if (kitInfo) {
-          result.push(buildKitComposite(iceCream!, ricotta!, options, kitInfo));
-        }
+        result.push(
+          buildKitComposite(
+            iceCream!,
+            ricotta!,
+            options,
+            resolveKitInfo(options),
+          ),
+        );
         compositeEmitted = true;
       }
       continue;
@@ -108,23 +112,11 @@ export function mergeCannoliItems(
   return result;
 }
 
-function resolveKitInfo(
-  iceCream: SnapshotItem,
-  ricotta: SnapshotItem,
-  options: {
-    kitModifierListName: string;
-    kitGroupSize: number;
-    perKitFeeCents: number;
-  }
-): { modifierListId: string; modifierId: string; perKitFeeCents: number; groupSize: number } | null {
-  // The kit modifier list lives on both fillings; either side is fine to read.
-  const list =
-    iceCream.modifierLists.find((ml) => ml.name === options.kitModifierListName) ??
-    ricotta.modifierLists.find((ml) => ml.name === options.kitModifierListName);
-  if (!list || list.modifiers.length === 0) return null;
+function resolveKitInfo(options: {
+  kitGroupSize: number;
+  perKitFeeCents: number;
+}): { perKitFeeCents: number; groupSize: number } {
   return {
-    modifierListId: list.id,
-    modifierId: list.modifiers[0].id,
     perKitFeeCents: options.perKitFeeCents,
     groupSize: options.kitGroupSize,
   };
@@ -177,8 +169,6 @@ function buildKitComposite(
     multipleBoxesModifierListName: string;
   },
   kitInfo: {
-    modifierListId: string;
-    modifierId: string;
     perKitFeeCents: number;
     groupSize: number;
   }

@@ -54,18 +54,15 @@ export type SnapshotItem = {
   // and the active filling supplies its own variations + modifier lists. The
   // top-level variations/modifierLists arrays are empty in that case.
   cannoliFillings?: CannoliFilling[];
-  // Set on the synthetic "Cannoli Kit" composite. Carries the Square modifier
-  // IDs the API route uses to attach the kit fee at submit, plus the qty
-  // grouping rules the UI enforces (step=groupSize, min=groupSize). The kit
-  // fee is sent as a per-attachment base_price override on the modifier
-  // (Square stores it at $0 in the catalog) with `modifier.quantity` set to
-  // floor(line_qty / groupSize) so the line's total is exactly fee × kits.
+  // Set on the synthetic "Cannoli Kit" composite. Carries the qty grouping
+  // rules the UI enforces (step=groupSize, min=groupSize) and the per-kit fee
+  // the order route applies. The fee is emitted as a separate ad-hoc line in
+  // the Square order (Square modifier prices always scale with line qty, so
+  // a modifier-based fee can't express "$2 per 6 cannolis").
   kit?: KitInfo;
 };
 
 export type KitInfo = {
-  modifierListId: string;
-  modifierId: string;
   perKitFeeCents: number;
   groupSize: number;
 };
@@ -135,12 +132,10 @@ export type OrderRequest = {
     // Surfaces in Square dashboard under the line item.
     note?: string;
     // Set when the line came from the Cannoli Kit composite. The server
-    // attaches `modifierId` to the line with base_price_money overridden to
-    // perKitFeeCents and modifier `quantity` set to count, producing exactly
-    // fee × count regardless of line qty (Square otherwise multiplies modifier
-    // price by line qty).
+    // emits an ad-hoc Square line item (name="Cannoli Kit", basePriceMoney=
+    // perKitFeeCents, quantity=count) right after the cannoli line. Discount
+    // rules target the cannoli product set so they ignore the ad-hoc line.
     kitModifier?: {
-      modifierId: string;
       perKitFeeCents: number;
       count: number;
     };
