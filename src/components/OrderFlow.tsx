@@ -216,6 +216,9 @@ export default function OrderFlow() {
               ? {
                   perKitFeeCents: item.kit.perKitFeeCents,
                   count: Math.floor(l.qty / item.kit.groupSize),
+                  ...(item.kit.modifierId
+                    ? { modifierId: item.kit.modifierId }
+                    : {}),
                 }
               : undefined;
           return {

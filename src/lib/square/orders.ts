@@ -9,8 +9,18 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
       catalogObjectId: l.catalogObjectId,
       quantity: String(l.quantity),
     };
-    if (l.modifiers.length > 0) {
-      item.modifiers = l.modifiers.map((m) => ({ catalogObjectId: m }));
+    const modifierEntries: any[] = l.modifiers.map((m) => ({
+      catalogObjectId: m,
+    }));
+    if (l.kitModifier?.modifierId) {
+      // Cosmetic POS marker — the catalog modifier is $0 so it doesn't move
+      // pricing; it just tags the line as a kit cannoli on the dashboard so
+      // the kitchen knows which cannolis go in the kit. The actual fee is
+      // the ad-hoc line emitted below.
+      modifierEntries.push({ catalogObjectId: l.kitModifier.modifierId });
+    }
+    if (modifierEntries.length > 0) {
+      item.modifiers = modifierEntries;
     }
     if (l.note && l.note.trim().length > 0) {
       item.note = l.note.trim();

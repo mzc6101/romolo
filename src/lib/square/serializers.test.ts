@@ -501,6 +501,7 @@ describe("mergeCannoliItems", () => {
     expect(kit.kit).toEqual({
       perKitFeeCents: 200,
       groupSize: 6,
+      modifierId: "ML_KIT_IC_M",
     });
     const [kitIc, kitRic] = kit.cannoliFillings!;
     expect(kitIc.variations.map((v) => v.id)).toEqual(["V_IC_FULL"]);
@@ -582,5 +583,6 @@ describe("mergeCannoliItems", () => {
       "cannoli-kit__composite",
     ]);
     expect(result[1].kit).toEqual({ perKitFeeCents: 200, groupSize: 6 });
+    expect(result[1].kit?.modifierId).toBeUndefined();
   });
 });
