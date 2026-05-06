@@ -4,7 +4,7 @@ import {
   serializeItem,
   serializeModifierList,
 } from "./serializers";
-import type { SnapshotItem } from "./types";
+import type { SnapshotItem, SnapshotModifierList } from "./types";
 
 describe("serializeModifierList", () => {
   it("maps a SINGLE-select Square modifier list with explicit min", () => {
@@ -408,123 +408,136 @@ describe("mergeCannoliItems", () => {
 
   const ICE_CREAM = "Cannoli Online - Ice Cream";
   const RICOTTA = "Cannoli Online - Ricotta";
-  const KIT = "Cannoli Online - Kit";
+  const KIT_LIST_NAME = "Cannoli Kit";
+  const BOXES_LIST_NAME = "Cannoli Multiple Boxes";
 
   const options = {
     iceCreamItemName: ICE_CREAM,
     ricottaItemName: RICOTTA,
-    kitItemName: KIT,
-    kitDisplayName: "Cannoli Kit",
     compositeName: "Cannoli",
     compositeId: "cannoli__composite",
+    kitCompositeName: "Cannoli Kit",
+    kitCompositeId: "cannoli-kit__composite",
+    kitModifierListName: KIT_LIST_NAME,
+    multipleBoxesModifierListName: BOXES_LIST_NAME,
+    kitGroupSize: 6,
+    perKitFeeCents: 200,
   };
 
-  it("merges Ice Cream + Ricotta into one composite, drops the underlying items", () => {
+  const kitListOn = (id: string): SnapshotModifierList => ({
+    id,
+    name: KIT_LIST_NAME,
+    modifierType: "list",
+    selectionType: "SINGLE",
+    minSelected: 0,
+    maxSelected: 1,
+    modifiers: [{ id: `${id}_M`, name: KIT_LIST_NAME, priceCents: 0 }],
+  });
+
+  const boxesListOn = (id: string): SnapshotModifierList => ({
+    id,
+    name: BOXES_LIST_NAME,
+    modifierType: "list",
+    selectionType: "SINGLE",
+    minSelected: 0,
+    maxSelected: 1,
+    modifiers: [],
+  });
+
+  it("emits Cannoli + Cannoli Kit composites and drops the underlying filling items", () => {
     const items: SnapshotItem[] = [
       mkItem({
         id: "I_IC",
         name: ICE_CREAM,
         variations: [
-          { id: "V_IC_FULL", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true },
-          { id: "V_IC_MINI", name: "Mini", priceCents: 400, inStock: true, pickupEnabled: true },
+          { id: "V_IC_FULL", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true },
+          { id: "V_IC_MINI", name: "Mini Size", priceCents: 400, inStock: true, pickupEnabled: true },
         ],
         modifierLists: [
+          boxesListOn("ML_BOXES_IC"),
           { id: "ML_FLAVOR", name: "Flavor", modifierType: "list", selectionType: "SINGLE", minSelected: 1, maxSelected: 1, modifiers: [] },
+          kitListOn("ML_KIT_IC"),
         ],
       }),
       mkItem({
         id: "I_RIC",
         name: RICOTTA,
         variations: [
-          { id: "V_RIC_FULL", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true },
-          { id: "V_RIC_MINI", name: "Mini", priceCents: 400, inStock: true, pickupEnabled: true },
+          { id: "V_RIC_FULL", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true },
+          { id: "V_RIC_MINI", name: "Mini Size", priceCents: 400, inStock: true, pickupEnabled: true },
         ],
         modifierLists: [
+          boxesListOn("ML_BOXES_RIC"),
           { id: "ML_SHELL", name: "Shell", modifierType: "list", selectionType: "SINGLE", minSelected: 1, maxSelected: 1, modifiers: [] },
           { id: "ML_FILLING", name: "Filling", modifierType: "list", selectionType: "SINGLE", minSelected: 1, maxSelected: 1, modifiers: [] },
           { id: "ML_GARNISH", name: "Garnish", modifierType: "list", selectionType: "MULTIPLE", minSelected: 0, maxSelected: 3, modifiers: [] },
+          kitListOn("ML_KIT_RIC"),
         ],
       }),
     ];
 
     const result = mergeCannoliItems(items, options);
 
-    expect(result).toHaveLength(1);
-    const composite = result[0];
-    expect(composite.id).toBe("cannoli__composite");
-    expect(composite.name).toBe("Cannoli");
-    expect(composite.variations).toEqual([]);
-    expect(composite.modifierLists).toEqual([]);
-    expect(composite.cannoliFillings).toBeDefined();
-
-    const [iceCream, ricotta] = composite.cannoliFillings!;
-    expect(iceCream.key).toBe("ice_cream");
-    expect(iceCream.label).toBe("Ice Cream");
-    expect(iceCream.squareItemId).toBe("I_IC");
-    expect(iceCream.variations.map((v) => v.id)).toEqual(["V_IC_FULL", "V_IC_MINI"]);
-    expect(iceCream.modifierLists.map((m) => m.id)).toEqual(["ML_FLAVOR"]);
-
-    expect(ricotta.key).toBe("ricotta");
-    expect(ricotta.squareItemId).toBe("I_RIC");
-    expect(ricotta.modifierLists.map((m) => m.id)).toEqual([
-      "ML_SHELL",
-      "ML_FILLING",
-      "ML_GARNISH",
+    expect(result.map((i) => i.id)).toEqual([
+      "cannoli__composite",
+      "cannoli-kit__composite",
     ]);
+
+    const [composite, kit] = result;
+
+    expect(composite.name).toBe("Cannoli");
+    expect(composite.kit).toBeUndefined();
+    const [ic, ric] = composite.cannoliFillings!;
+    expect(ic.variations.map((v) => v.id)).toEqual(["V_IC_FULL", "V_IC_MINI"]);
+    expect(ic.modifierLists.map((m) => m.name)).toEqual(["Cannoli Multiple Boxes", "Flavor"]);
+    expect(ric.modifierLists.map((m) => m.name)).toEqual([
+      "Cannoli Multiple Boxes",
+      "Shell",
+      "Filling",
+      "Garnish",
+    ]);
+
+    expect(kit.name).toBe("Cannoli Kit");
+    expect(kit.kit).toEqual({
+      modifierListId: "ML_KIT_IC",
+      modifierId: "ML_KIT_IC_M",
+      perKitFeeCents: 200,
+      groupSize: 6,
+    });
+    const [kitIc, kitRic] = kit.cannoliFillings!;
+    expect(kitIc.variations.map((v) => v.id)).toEqual(["V_IC_FULL"]);
+    expect(kitIc.modifierLists.map((m) => m.name)).toEqual(["Flavor"]);
+    expect(kitRic.variations.map((v) => v.id)).toEqual(["V_RIC_FULL"]);
+    expect(kitRic.modifierLists.map((m) => m.name)).toEqual(["Shell", "Filling", "Garnish"]);
   });
 
-  it("renames the kit item and keeps it as a regular item", () => {
-    const items: SnapshotItem[] = [
-      mkItem({
-        id: "I_IC",
-        name: ICE_CREAM,
-        variations: [
-          { id: "V_IC", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true },
-        ],
-      }),
-      mkItem({
-        id: "I_RIC",
-        name: RICOTTA,
-        variations: [
-          { id: "V_RIC", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true },
-        ],
-      }),
-      mkItem({
-        id: "I_KIT",
-        name: KIT,
-        variations: [
-          { id: "V_KIT", name: "Set of 6", priceCents: 2000, inStock: true, pickupEnabled: true },
-        ],
-      }),
-    ];
-    const result = mergeCannoliItems(items, options);
-    expect(result.map((i) => i.name)).toEqual(["Cannoli", "Cannoli Kit"]);
-    const kit = result[1];
-    expect(kit.id).toBe("I_KIT");
-    expect(kit.cannoliFillings).toBeUndefined();
-    expect(kit.variations).toHaveLength(1);
-  });
-
-  it("places the composite at the position of the first cannoli filling", () => {
+  it("places composites at the position of the first filling, preserving surrounding items", () => {
     const items: SnapshotItem[] = [
       mkItem({ id: "I_COOK", name: "Cookies" }),
       mkItem({
         id: "I_IC",
         name: ICE_CREAM,
-        variations: [{ id: "V1", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true }],
+        variations: [{ id: "V1", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true }],
+        modifierLists: [kitListOn("ML_KIT")],
       }),
       mkItem({ id: "I_GELATO", name: "Gelato" }),
       mkItem({
         id: "I_RIC",
         name: RICOTTA,
-        variations: [{ id: "V2", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true }],
+        variations: [{ id: "V2", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true }],
+        modifierLists: [kitListOn("ML_KIT")],
       }),
     ];
     const result = mergeCannoliItems(items, options);
-    expect(result.map((i) => i.name)).toEqual(["Cookies", "Cannoli", "Gelato"]);
+    expect(result.map((i) => i.name)).toEqual([
+      "Cookies",
+      "Cannoli",
+      "Cannoli Kit",
+      "Gelato",
+    ]);
   });
 
-  it("passes through unrelated items unchanged", () => {
+  it("passes through unrelated items unchanged when no fillings exist", () => {
     const items: SnapshotItem[] = [
       mkItem({ id: "I_COOK", name: "Cookies", categoryName: "Cookies" }),
       mkItem({ id: "I_GELATO", name: "Gelato", categoryName: "Frozen" }),
@@ -533,17 +546,35 @@ describe("mergeCannoliItems", () => {
     expect(result).toEqual(items);
   });
 
-  it("does not produce a composite when only one filling exists", () => {
+  it("does not produce composites when only one filling exists", () => {
     const items: SnapshotItem[] = [
       mkItem({
         id: "I_IC",
         name: ICE_CREAM,
-        variations: [{ id: "V_IC", name: "Full", priceCents: 700, inStock: true, pickupEnabled: true }],
+        variations: [{ id: "V_IC", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true }],
       }),
-      mkItem({ id: "I_KIT", name: KIT, variations: [] }),
     ];
     const result = mergeCannoliItems(items, options);
-    expect(result.map((i) => i.name)).toEqual([ICE_CREAM, "Cannoli Kit"]);
+    expect(result.map((i) => i.name)).toEqual([ICE_CREAM]);
     expect(result[0].cannoliFillings).toBeUndefined();
+  });
+
+  it("omits the kit composite when the kit modifier list is missing", () => {
+    const items: SnapshotItem[] = [
+      mkItem({
+        id: "I_IC",
+        name: ICE_CREAM,
+        variations: [{ id: "V_IC", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true }],
+        modifierLists: [],
+      }),
+      mkItem({
+        id: "I_RIC",
+        name: RICOTTA,
+        variations: [{ id: "V_RIC", name: "Full Size", priceCents: 700, inStock: true, pickupEnabled: true }],
+        modifierLists: [],
+      }),
+    ];
+    const result = mergeCannoliItems(items, options);
+    expect(result.map((i) => i.id)).toEqual(["cannoli__composite"]);
   });
 });

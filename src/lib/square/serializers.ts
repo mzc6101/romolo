@@ -54,30 +54,39 @@ export function serializePricingRule(raw: any): SnapshotPricingRule {
 }
 
 // Merges Square's two filling-type Cannoli items ("Cannoli Online - Ice Cream",
-// "Cannoli Online - Ricotta") into a single composite frontend item ("Cannoli")
-// with a `cannoliFillings` payload, and renames "Cannoli Online - Kit" to its
-// display name. Square models filling type as separate items because modifier
-// lists can't be scoped to specific variations — so the merge happens here on
-// the frontend instead. Returns items in their original order; the composite
-// takes the position of whichever underlying filling appears first.
+// "Cannoli Online - Ricotta") into composite frontend items. Square models
+// filling type as separate items because modifier lists can't be scoped to
+// specific variations — so the merge happens here on the frontend instead.
 //
-// If only one of Ice Cream / Ricotta exists, no composite is produced — that
-// filling stays as a normal item. Items not matching any of the three names
-// pass through untouched.
+// Two composites are emitted (in order, at the position of the first
+// underlying filling):
+//   1. "Cannoli" — full menu (both sizes, all modifier lists except the kit
+//      modifier list, which is reserved for the kit composite).
+//   2. "Cannoli Kit" — Full Size only, modifier lists minus Multiple Boxes
+//      and minus the Kit modifier list (the kit fee is auto-applied at
+//      submit, so the user shouldn't see the toggle). Tagged with KitInfo so
+//      the frontend can drive qty stepping by groupSize and submit the
+//      override.
+//
+// If only one filling exists, no composite is produced — that filling passes
+// through untouched. Items not matching either name pass through untouched.
 export function mergeCannoliItems(
   items: SnapshotItem[],
   options: {
     iceCreamItemName: string;
     ricottaItemName: string;
-    kitItemName: string;
-    kitDisplayName: string;
     compositeName: string;
     compositeId: string;
+    kitCompositeName: string;
+    kitCompositeId: string;
+    kitModifierListName: string;
+    multipleBoxesModifierListName: string;
+    kitGroupSize: number;
+    perKitFeeCents: number;
   }
 ): SnapshotItem[] {
   const iceCream = items.find((i) => i.name === options.iceCreamItemName);
   const ricotta = items.find((i) => i.name === options.ricottaItemName);
-  const kit = items.find((i) => i.name === options.kitItemName);
   const compositePossible = !!iceCream && !!ricotta;
   let compositeEmitted = false;
 
@@ -85,41 +94,134 @@ export function mergeCannoliItems(
   for (const item of items) {
     if (compositePossible && (item === iceCream || item === ricotta)) {
       if (!compositeEmitted) {
-        result.push({
-          id: options.compositeId,
-          name: options.compositeName,
-          description: undefined,
-          categoryName: iceCream!.categoryName ?? ricotta!.categoryName,
-          variations: [],
-          modifierLists: [],
-          cannoliFillings: [
-            {
-              key: "ice_cream",
-              label: "Ice Cream",
-              squareItemId: iceCream!.id,
-              variations: iceCream!.variations,
-              modifierLists: iceCream!.modifierLists,
-            },
-            {
-              key: "ricotta",
-              label: "Ricotta",
-              squareItemId: ricotta!.id,
-              variations: ricotta!.variations,
-              modifierLists: ricotta!.modifierLists,
-            },
-          ],
-        });
+        const kitInfo = resolveKitInfo(iceCream!, ricotta!, options);
+        result.push(buildRegularComposite(iceCream!, ricotta!, options));
+        if (kitInfo) {
+          result.push(buildKitComposite(iceCream!, ricotta!, options, kitInfo));
+        }
         compositeEmitted = true;
       }
-      continue;
-    }
-    if (kit && item === kit) {
-      result.push({ ...kit, name: options.kitDisplayName });
       continue;
     }
     result.push(item);
   }
   return result;
+}
+
+function resolveKitInfo(
+  iceCream: SnapshotItem,
+  ricotta: SnapshotItem,
+  options: {
+    kitModifierListName: string;
+    kitGroupSize: number;
+    perKitFeeCents: number;
+  }
+): { modifierListId: string; modifierId: string; perKitFeeCents: number; groupSize: number } | null {
+  // The kit modifier list lives on both fillings; either side is fine to read.
+  const list =
+    iceCream.modifierLists.find((ml) => ml.name === options.kitModifierListName) ??
+    ricotta.modifierLists.find((ml) => ml.name === options.kitModifierListName);
+  if (!list || list.modifiers.length === 0) return null;
+  return {
+    modifierListId: list.id,
+    modifierId: list.modifiers[0].id,
+    perKitFeeCents: options.perKitFeeCents,
+    groupSize: options.kitGroupSize,
+  };
+}
+
+function buildRegularComposite(
+  iceCream: SnapshotItem,
+  ricotta: SnapshotItem,
+  options: {
+    compositeId: string;
+    compositeName: string;
+    kitModifierListName: string;
+  }
+): SnapshotItem {
+  const stripKit = (lists: SnapshotModifierList[]) =>
+    lists.filter((ml) => ml.name !== options.kitModifierListName);
+  return {
+    id: options.compositeId,
+    name: options.compositeName,
+    description: undefined,
+    categoryName: iceCream.categoryName ?? ricotta.categoryName,
+    variations: [],
+    modifierLists: [],
+    cannoliFillings: [
+      {
+        key: "ice_cream",
+        label: "Ice Cream",
+        squareItemId: iceCream.id,
+        variations: iceCream.variations,
+        modifierLists: stripKit(iceCream.modifierLists),
+      },
+      {
+        key: "ricotta",
+        label: "Ricotta",
+        squareItemId: ricotta.id,
+        variations: ricotta.variations,
+        modifierLists: stripKit(ricotta.modifierLists),
+      },
+    ],
+  };
+}
+
+function buildKitComposite(
+  iceCream: SnapshotItem,
+  ricotta: SnapshotItem,
+  options: {
+    kitCompositeId: string;
+    kitCompositeName: string;
+    kitModifierListName: string;
+    multipleBoxesModifierListName: string;
+  },
+  kitInfo: {
+    modifierListId: string;
+    modifierId: string;
+    perKitFeeCents: number;
+    groupSize: number;
+  }
+): SnapshotItem {
+  // Only Full Size cannolis qualify for the kit; Mini is hidden so the user
+  // can't pick an ineligible size. Match by lowercased prefix so renames like
+  // "Full Size" / "Full Size - Single" both keep working.
+  const fullSizeOnly = (vs: SnapshotItem["variations"]) =>
+    vs.filter((v) => v.name.toLowerCase().startsWith("full"));
+  // Multiple Boxes is removed because each kit *is* a box. The kit modifier
+  // list itself is removed because the fee auto-applies — surfacing the
+  // toggle would let users untick it and short the store $2.
+  const stripKitAndBoxes = (lists: SnapshotModifierList[]) =>
+    lists.filter(
+      (ml) =>
+        ml.name !== options.kitModifierListName &&
+        ml.name !== options.multipleBoxesModifierListName
+    );
+  return {
+    id: options.kitCompositeId,
+    name: options.kitCompositeName,
+    description: undefined,
+    categoryName: iceCream.categoryName ?? ricotta.categoryName,
+    variations: [],
+    modifierLists: [],
+    cannoliFillings: [
+      {
+        key: "ice_cream",
+        label: "Ice Cream",
+        squareItemId: iceCream.id,
+        variations: fullSizeOnly(iceCream.variations),
+        modifierLists: stripKitAndBoxes(iceCream.modifierLists),
+      },
+      {
+        key: "ricotta",
+        label: "Ricotta",
+        squareItemId: ricotta.id,
+        variations: fullSizeOnly(ricotta.variations),
+        modifierLists: stripKitAndBoxes(ricotta.modifierLists),
+      },
+    ],
+    kit: kitInfo,
+  };
 }
 
 export function serializeModifier(raw: any): SnapshotModifier {

@@ -8,8 +8,25 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
       catalogObjectId: l.catalogObjectId,
       quantity: String(l.quantity),
     };
-    if (l.modifiers.length > 0) {
-      item.modifiers = l.modifiers.map((m) => ({ catalogObjectId: m }));
+    const modifierEntries: any[] = l.modifiers.map((m) => ({
+      catalogObjectId: m,
+    }));
+    if (l.kitModifier) {
+      // Square multiplies modifier price by line qty by default; setting
+      // `quantity` on the modifier itself decouples it so the kit fee scales
+      // by kit-count (groups of 6) instead of cannoli-count. base_price
+      // overrides the $0 catalog price.
+      modifierEntries.push({
+        catalogObjectId: l.kitModifier.modifierId,
+        basePriceMoney: {
+          amount: BigInt(l.kitModifier.perKitFeeCents),
+          currency: "USD",
+        },
+        quantity: String(l.kitModifier.count),
+      });
+    }
+    if (modifierEntries.length > 0) {
+      item.modifiers = modifierEntries;
     }
     if (l.note && l.note.trim().length > 0) {
       item.note = l.note.trim();

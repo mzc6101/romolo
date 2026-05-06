@@ -123,6 +123,13 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
   const item = snapshot.items.find((i) => i.id === line.itemId);
   if (!item) return false;
   if (item.cannoliFillings && !line.fillingKey) return false;
+  if (item.kit) {
+    // Kit lines must be in whole groups (a kit covers exactly groupSize
+    // cannolis). The qty stepper enforces this in the UI, but a paste or
+    // manual edit could land on an off-step value.
+    if (line.qty < item.kit.groupSize) return false;
+    if (line.qty % item.kit.groupSize !== 0) return false;
+  }
   const variations = activeVariations(item, line.fillingKey);
   const modifierLists = activeModifierLists(item, line.fillingKey);
   const variation = variations.find((v) => v.id === line.variationId);
@@ -204,11 +211,20 @@ export default function OrderFlow() {
               noteParts.push(`${ml.name}: ${text}`);
             }
           }
+          const kitModifier =
+            item?.kit
+              ? {
+                  modifierId: item.kit.modifierId,
+                  perKitFeeCents: item.kit.perKitFeeCents,
+                  count: Math.floor(l.qty / item.kit.groupSize),
+                }
+              : undefined;
           return {
             catalogObjectId: l.variationId,
             quantity: l.qty,
             modifiers: Object.values(l.modifiers).flat(),
             ...(noteParts.length > 0 ? { note: noteParts.join(" | ") } : {}),
+            ...(kitModifier ? { kitModifier } : {}),
           };
         }),
       }),
@@ -591,7 +607,7 @@ function StepWhat({
           itemId: firstItem.id,
           fillingKey: undefined,
           variationId: firstVariation?.id ?? "",
-          qty: 1,
+          qty: firstItem.kit ? firstItem.kit.groupSize : 1,
           modifiers: seedModifiers,
           freeText: seedFreeText,
         },
@@ -666,7 +682,7 @@ function OrderLineEditor({
       itemId: id,
       fillingKey: undefined,
       variationId: firstVariation?.id ?? "",
-      qty: 1,
+      qty: next.kit ? next.kit.groupSize : 1,
       modifiers: seedModifiers,
       freeText: seedFreeText,
     });
@@ -676,13 +692,17 @@ function OrderLineEditor({
     if (!item.cannoliFillings) return;
     const filling = item.cannoliFillings.find((f) => f.key === key);
     if (!filling) return;
-    // Size stays unselected — user picks it explicitly. Modifier lists are
-    // seeded so required SINGLE-select lists block "Continue" until chosen.
+    // For the regular Cannoli composite the user picks Full or Mini, so
+    // size stays unselected. For the Kit composite there's only Full Size
+    // — VariationPicker doesn't render at all in that case, so we have to
+    // auto-select or `lineValid` would never pass.
+    const autoVariationId =
+      filling.variations.length === 1 ? filling.variations[0].id : "";
     const { modifiers: seedModifiers, freeText: seedFreeText } =
       seedSelectionsForLists(filling.modifierLists);
     onChange({
       fillingKey: key,
-      variationId: "",
+      variationId: autoVariationId,
       modifiers: seedModifiers,
       freeText: seedFreeText,
     });
@@ -711,8 +731,8 @@ function OrderLineEditor({
         <div className="flex items-center gap-2 shrink-0">
           <QtyStepper
             qty={line.qty}
-            step={1}
-            min={1}
+            step={item.kit ? item.kit.groupSize : 1}
+            min={item.kit ? item.kit.groupSize : 1}
             onChange={(v) => onChange({ qty: v })}
           />
           {onRemove && (
@@ -993,6 +1013,11 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
 
 function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapshot }) {
   const discountLines: DiscountLine[] = [];
+  // Kit fees sit outside discount math: the cannoli quantity tier is about
+  // cannolis-per-order, and the kit charge is packaging that gets added on
+  // top regardless of any discount that fires on the cannolis themselves.
+  let kitFeeCents = 0;
+  let kitCount = 0;
   for (const l of order.lines) {
     const item = snapshot.items.find((i) => i.id === l.itemId);
     if (!item) continue;
@@ -1014,10 +1039,17 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
       quantity: l.qty,
       subtotalCents: unitCents * l.qty,
     });
+    if (item.kit) {
+      const count = Math.floor(l.qty / item.kit.groupSize);
+      kitCount += count;
+      kitFeeCents += count * item.kit.perKitFeeCents;
+    }
   }
 
-  const { subtotalCents, discountCents, totalCents, applied } =
+  const { subtotalCents, discountCents, totalCents: cannoliTotalCents, applied } =
     computeDiscounts(discountLines, snapshot);
+  const totalCents = cannoliTotalCents + kitFeeCents;
+  const showBreakdown = discountCents > 0 || kitFeeCents > 0;
 
   // Aggregate applied discounts by name for compact display
   const discountByName = new Map<string, number>();
@@ -1027,7 +1059,7 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
 
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
-      {discountCents > 0 ? (
+      {showBreakdown ? (
         <>
           <div className="flex items-baseline justify-between gap-3 text-[11px]">
             <span>Subtotal</span>
@@ -1043,6 +1075,12 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
               <span className="tabular-nums">−{fmtCents(amount)}</span>
             </div>
           ))}
+          {kitFeeCents > 0 && (
+            <div className="flex items-baseline justify-between gap-3 text-[11px]">
+              <span>Cannoli Kit{kitCount > 1 ? ` × ${kitCount}` : ""}</span>
+              <span className="tabular-nums">+{fmtCents(kitFeeCents)}</span>
+            </div>
+          )}
           <div className="text-[11px] tracking-[0.15em] uppercase mt-1">Total</div>
           <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal leading-none">
             {fmtCents(totalCents)}

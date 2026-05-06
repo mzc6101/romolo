@@ -8,6 +8,16 @@ const lineSchema = z.object({
   modifiers: z.array(z.string()),
   // Square line-item notes cap at 2000 chars; we cap a bit lower for safety.
   note: z.string().max(500).optional(),
+  // Set when the line came from the Cannoli Kit composite. Server attaches
+  // the modifier with overridden price + quantity (Square stores the catalog
+  // price at $0; the override is what makes the math correct).
+  kitModifier: z
+    .object({
+      modifierId: z.string().min(1),
+      perKitFeeCents: z.number().int().min(0).max(10_000),
+      count: z.number().int().min(1).max(20),
+    })
+    .optional(),
 });
 
 const bodySchema = z.object({

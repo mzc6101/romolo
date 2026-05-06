@@ -15,10 +15,10 @@ import type {
   SnapshotProductSet,
 } from "./types";
 
-// Square now models cannoli as three separate items so each filling type can
-// own its own modifier lists (Square modifier lists don't scope to specific
-// variations). The frontend re-merges Ice Cream + Ricotta back into one
-// composite "Cannoli" item with a filling-type picker — see mergeCannoliItems.
+// Square models the two filling types as separate items so each can own its
+// own modifier lists (Square modifier lists don't scope to specific
+// variations). The frontend re-merges them into composite "Cannoli" and
+// "Cannoli Kit" items with a filling-type picker — see mergeCannoliItems.
 //
 // The Square Cannoli category also contains legacy items ("Cannoli",
 // "Cannoli Kit (Per 6)", etc.) that aren't part of the online flow. Items in
@@ -27,15 +27,21 @@ import type {
 const CANNOLI_CATEGORY_NAME = "Cannoli";
 const CANNOLI_ICE_CREAM_NAME = "Cannoli Online - Ice Cream";
 const CANNOLI_RICOTTA_NAME = "Cannoli Online - Ricotta";
-const CANNOLI_KIT_NAME = "Cannoli Online - Kit";
 const CANNOLI_ALLOWED_NAMES = new Set<string>([
   CANNOLI_ICE_CREAM_NAME,
   CANNOLI_RICOTTA_NAME,
-  CANNOLI_KIT_NAME,
 ]);
 const CANNOLI_COMPOSITE_NAME = "Cannoli";
 const CANNOLI_COMPOSITE_ID = "cannoli__composite";
-const CANNOLI_KIT_DISPLAY_NAME = "Cannoli Kit";
+const KIT_COMPOSITE_NAME = "Cannoli Kit";
+const KIT_COMPOSITE_ID = "cannoli-kit__composite";
+// Modifier list names used to find the kit modifier (so its fee can be
+// applied at submit) and the Multiple Boxes list (hidden on kit lines).
+const KIT_MODIFIER_LIST_NAME = "Cannoli Kit";
+const MULTIPLE_BOXES_MODIFIER_LIST_NAME = "Cannoli Multiple Boxes";
+// One kit per six full-size cannolis at $2 per kit.
+const KIT_GROUP_SIZE = 6;
+const PER_KIT_FEE_CENTS = 200;
 
 export async function getCatalog(): Promise<{
   items: SnapshotItem[];
@@ -119,10 +125,14 @@ export async function getCatalog(): Promise<{
   const mergedItems = mergeCannoliItems(items, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,
     ricottaItemName: CANNOLI_RICOTTA_NAME,
-    kitItemName: CANNOLI_KIT_NAME,
-    kitDisplayName: CANNOLI_KIT_DISPLAY_NAME,
     compositeName: CANNOLI_COMPOSITE_NAME,
     compositeId: CANNOLI_COMPOSITE_ID,
+    kitCompositeName: KIT_COMPOSITE_NAME,
+    kitCompositeId: KIT_COMPOSITE_ID,
+    kitModifierListName: KIT_MODIFIER_LIST_NAME,
+    multipleBoxesModifierListName: MULTIPLE_BOXES_MODIFIER_LIST_NAME,
+    kitGroupSize: KIT_GROUP_SIZE,
+    perKitFeeCents: PER_KIT_FEE_CENTS,
   });
 
   const discounts = allObjects

@@ -10,15 +10,18 @@ import type { SnapshotItem } from "../src/lib/square/types";
 const CANNOLI_CATEGORY_NAME = "Cannoli";
 const CANNOLI_ICE_CREAM_NAME = "Cannoli Online - Ice Cream";
 const CANNOLI_RICOTTA_NAME = "Cannoli Online - Ricotta";
-const CANNOLI_KIT_NAME = "Cannoli Online - Kit";
 const CANNOLI_ALLOWED_NAMES = new Set<string>([
   CANNOLI_ICE_CREAM_NAME,
   CANNOLI_RICOTTA_NAME,
-  CANNOLI_KIT_NAME,
 ]);
 const CANNOLI_COMPOSITE_NAME = "Cannoli";
 const CANNOLI_COMPOSITE_ID = "cannoli__composite";
-const CANNOLI_KIT_DISPLAY_NAME = "Cannoli Kit";
+const KIT_COMPOSITE_NAME = "Cannoli Kit";
+const KIT_COMPOSITE_ID = "cannoli-kit__composite";
+const KIT_MODIFIER_LIST_NAME = "Cannoli Kit";
+const MULTIPLE_BOXES_MODIFIER_LIST_NAME = "Cannoli Multiple Boxes";
+const KIT_GROUP_SIZE = 6;
+const PER_KIT_FEE_CENTS = 200;
 
 async function main() {
   const token = process.env.SQUARE_ACCESS_TOKEN!;
@@ -95,10 +98,14 @@ async function main() {
   const merged = mergeCannoliItems(items, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,
     ricottaItemName: CANNOLI_RICOTTA_NAME,
-    kitItemName: CANNOLI_KIT_NAME,
-    kitDisplayName: CANNOLI_KIT_DISPLAY_NAME,
     compositeName: CANNOLI_COMPOSITE_NAME,
     compositeId: CANNOLI_COMPOSITE_ID,
+    kitCompositeName: KIT_COMPOSITE_NAME,
+    kitCompositeId: KIT_COMPOSITE_ID,
+    kitModifierListName: KIT_MODIFIER_LIST_NAME,
+    multipleBoxesModifierListName: MULTIPLE_BOXES_MODIFIER_LIST_NAME,
+    kitGroupSize: KIT_GROUP_SIZE,
+    perKitFeeCents: PER_KIT_FEE_CENTS,
   });
 
   console.log(`\n== After merge: ${merged.length} items ==\n`);

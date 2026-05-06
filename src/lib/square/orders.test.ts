@@ -81,4 +81,35 @@ describe("buildOrderPayload", () => {
     );
     expect((payload.order.lineItems![0] as any).note).toBeUndefined();
   });
+
+  it("appends a kit modifier with overridden price + quantity for kit lines", () => {
+    const payload = buildOrderPayload(
+      {
+        ...baseRequest,
+        lines: [
+          {
+            catalogObjectId: "VAR_RIC_FULL",
+            quantity: 12,
+            modifiers: ["MOD_SHELL_TOFFEE"],
+            kitModifier: {
+              modifierId: "MOD_KIT",
+              perKitFeeCents: 200,
+              count: 2,
+            },
+          },
+        ],
+      },
+      "LOC_TEST"
+    );
+    const line = payload.order.lineItems![0] as any;
+    expect(line.quantity).toBe("12");
+    expect(line.modifiers).toEqual([
+      { catalogObjectId: "MOD_SHELL_TOFFEE" },
+      {
+        catalogObjectId: "MOD_KIT",
+        basePriceMoney: { amount: BigInt(200), currency: "USD" },
+        quantity: "2",
+      },
+    ]);
+  });
 });
