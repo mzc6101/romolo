@@ -30,13 +30,13 @@ const CACHE_SECONDS = 900;
 // to a freshly deployed page (and to a dev server that's seen old data).
 const cachedCatalog = unstable_cache(
   async () => getCatalog(),
-  ["square-catalog", "v2"],
+  ["square-catalog", "v3"],
   { revalidate: CACHE_SECONDS },
 );
 
 const cachedHours = unstable_cache(
   async () => getOpenPeriods(),
-  ["square-hours", "v2"],
+  ["square-hours", "v3"],
   { revalidate: CACHE_SECONDS },
 );
 
