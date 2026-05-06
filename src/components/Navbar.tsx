@@ -53,11 +53,22 @@ export default function Navbar() {
               }}
             >
               <Image
-                src={scrolled ? "/RmLogo.png" : "/RmLogoWhite.png"}
+                src="/RmLogoWhite.png"
                 alt="Romolo logo"
                 width={140}
                 height={36}
-                className="hidden xl:block absolute right-full mr-5 h-8 w-auto object-contain pointer-events-none select-none transition-opacity duration-500 opacity-100"
+                className={`hidden xl:block absolute right-full mr-5 h-8 w-auto object-contain pointer-events-none select-none transition-opacity duration-500 ${
+                  scrolled ? "opacity-0" : "opacity-100"
+                }`}
+              />
+              <Image
+                src="/RmLogo.png"
+                alt="Romolo logo"
+                width={140}
+                height={36}
+                className={`hidden xl:block absolute right-full mr-5 h-8 w-auto object-contain pointer-events-none select-none transition-opacity duration-500 ${
+                  scrolled ? "opacity-100" : "opacity-0"
+                }`}
               />
               <span
                 className={`font-[var(--font-serif)] text-xl lg:text-2xl font-semibold tracking-wide transition-colors duration-500 ${
