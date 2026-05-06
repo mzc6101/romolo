@@ -146,10 +146,15 @@ export function serializeModifierList(raw: any): SnapshotModifierList {
   const selectionType: "SINGLE" | "MULTIPLE" =
     data.selectionType === "MULTIPLE" ? "MULTIPLE" : "SINGLE";
 
+  // Square uses -1 as the "unset / no override" sentinel for these fields, so
+  // anything negative collapses to defaults (min=0, max=unlimited). Same
+  // convention applies to the per-attachment override in serializeItem.
   const rawMin = data.minSelectedModifiers;
   const rawMax = data.maxSelectedModifiers;
-  const minSelected = rawMin != null ? Number(rawMin) : 0;
-  const maxSelected = rawMax != null ? Number(rawMax) : null;
+  const minSelected =
+    rawMin != null && Number(rawMin) >= 0 ? Number(rawMin) : 0;
+  const maxSelected =
+    rawMax != null && Number(rawMax) >= 0 ? Number(rawMax) : null;
 
   if (modifierType === "text") {
     return {
@@ -221,13 +226,18 @@ export function serializeItem(
   for (const info of enabledInfos) {
     const base = allModifierLists.find((ml) => ml.id === info.modifierListId);
     if (!base) continue;
-    // Per-attachment min/max override the list-level values when present.
+    // Per-attachment min/max override the list-level values when set to a
+    // non-negative integer. Square sends -1 to mean "no override" (and that
+    // sentinel is also used to clear a previously-set override) — treating
+    // -1 as a real cap would block every selection.
     const overrideMin = info.minSelectedModifiers;
     const overrideMax = info.maxSelectedModifiers;
+    const useOverrideMin = overrideMin != null && Number(overrideMin) >= 0;
+    const useOverrideMax = overrideMax != null && Number(overrideMax) >= 0;
     modifierLists.push({
       ...base,
-      minSelected: overrideMin != null ? Number(overrideMin) : base.minSelected,
-      maxSelected: overrideMax != null ? Number(overrideMax) : base.maxSelected,
+      minSelected: useOverrideMin ? Number(overrideMin) : base.minSelected,
+      maxSelected: useOverrideMax ? Number(overrideMax) : base.maxSelected,
     });
   }
 

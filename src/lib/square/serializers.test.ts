@@ -104,6 +104,22 @@ describe("serializeModifierList", () => {
     expect(result.modifiers).toEqual([]);
   });
 
+  it("normalizes -1 min/max on the base list to defaults", () => {
+    const result = serializeModifierList({
+      type: "MODIFIER_LIST",
+      id: "ML_NEG",
+      modifierListData: {
+        name: "Topping",
+        selectionType: "MULTIPLE",
+        minSelectedModifiers: -1,
+        maxSelectedModifiers: -1,
+        modifiers: [],
+      },
+    } as any);
+    expect(result.minSelected).toBe(0);
+    expect(result.maxSelected).toBe(null);
+  });
+
   it("maps a TEXT modifier list to a free-text shape", () => {
     const result = serializeModifierList({
       type: "MODIFIER_LIST",
@@ -192,6 +208,40 @@ describe("serializeItem", () => {
     expect(result.modifierLists).toHaveLength(1);
     expect(result.modifierLists[0].id).toBe("ML1");
     expect(result.modifierLists[0].minSelected).toBe(1);
+  });
+
+  it("treats -1 sentinel from modifierListInfo as 'no override'", () => {
+    // Square emits -1 when no per-attachment override is set; honoring that as
+    // a real value would clamp maxSelected to -1 and block every selection.
+    const item = {
+      type: "ITEM",
+      id: "I_NEG_OVERRIDE",
+      itemData: {
+        name: "Item",
+        variations: [
+          {
+            type: "ITEM_VARIATION",
+            id: "V",
+            itemVariationData: {
+              name: "Default",
+              priceMoney: { amount: BigInt(100), currency: "USD" },
+            },
+          },
+        ],
+        modifierListInfo: [
+          {
+            modifierListId: "ML1",
+            enabled: true,
+            minSelectedModifiers: -1,
+            maxSelectedModifiers: -1,
+          },
+        ],
+      },
+    } as any;
+    const result = serializeItem(item, "Cat", modifierLists, {});
+    // Falls through to the base list values rather than -1.
+    expect(result.modifierLists[0].minSelected).toBe(1);
+    expect(result.modifierLists[0].maxSelected).toBe(1);
   });
 
   it("applies per-attachment min/max overrides from modifierListInfo", () => {
