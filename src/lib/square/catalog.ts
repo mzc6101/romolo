@@ -11,9 +11,71 @@ import {
 import type {
   SnapshotDiscount,
   SnapshotItem,
+  SnapshotModifierList,
   SnapshotPricingRule,
   SnapshotProductSet,
 } from "./types";
+
+// Walks the raw Square objects and applies per-location sold-out flags onto
+// the serialized snapshot. We post-process here (rather than threading the
+// location id through every serializer) because:
+//   - Variation in-stock signal is already location-scoped via inventory
+//     counts; folding the dashboard sold-out toggle into `inStock` keeps the
+//     UI logic uniform (one `inStock` boolean to render against).
+//   - Modifier sold-out lives in ModifierLocationOverrides, which the
+//     serializer doesn't see. Adding a `soldOut` flag to SnapshotModifier and
+//     mutating in place propagates to every item that references the same
+//     modifier (since serializeItem shares the modifiers array by reference).
+//
+// Triggered in production by the catalog.version.updated webhook (sold-out
+// toggle in dashboard → catalog mutation → revalidateTag → next request
+// rebuilds the snapshot through this path).
+function applyLocationSoldOut(
+  items: SnapshotItem[],
+  allModifierLists: SnapshotModifierList[],
+  rawItems: any[],
+  rawModifierLists: any[],
+  locationId: string
+): void {
+  const variationSoldOut = new Set<string>();
+  for (const raw of rawItems) {
+    for (const v of raw.itemData?.variations ?? []) {
+      const overrides = v.itemVariationData?.locationOverrides ?? [];
+      if (
+        overrides.some(
+          (o: any) => o.locationId === locationId && o.soldOut === true
+        )
+      ) {
+        variationSoldOut.add(v.id);
+      }
+    }
+  }
+
+  const modifierSoldOut = new Set<string>();
+  for (const raw of rawModifierLists) {
+    for (const m of raw.modifierListData?.modifiers ?? []) {
+      const overrides = m.modifierData?.locationOverrides ?? [];
+      if (
+        overrides.some(
+          (o: any) => o.locationId === locationId && o.soldOut === true
+        )
+      ) {
+        modifierSoldOut.add(m.id);
+      }
+    }
+  }
+
+  for (const item of items) {
+    for (const v of item.variations) {
+      if (variationSoldOut.has(v.id)) v.inStock = false;
+    }
+  }
+  for (const ml of allModifierLists) {
+    for (const m of ml.modifiers) {
+      if (modifierSoldOut.has(m.id)) m.soldOut = true;
+    }
+  }
+}
 
 // Square models the two filling types as separate items so each can own its
 // own modifier lists (Square modifier lists don't scope to specific
@@ -121,6 +183,8 @@ export async function getCatalog(): Promise<{
       serializeItem(raw, categoryName, allModifierLists, stockByVariationId)
     );
   }
+
+  applyLocationSoldOut(items, allModifierLists, itemObjects, modifierListsRaw, locationId);
 
   const mergedItems = mergeCannoliItems(items, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,

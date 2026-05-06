@@ -111,6 +111,9 @@ export type SnapshotModifier = {
   id: string;
   name: string;
   priceCents: number;
+  // True when ModifierLocationOverrides.sold_out is set for our location in
+  // Square. Set during catalog post-processing in catalog.ts.
+  soldOut?: boolean;
 };
 
 export type OpenPeriods = {

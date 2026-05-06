@@ -88,21 +88,35 @@ export function ModifierSet({
       <div className="flex flex-wrap gap-2">
         {list.modifiers.map((m) => {
           const sel = selectedIds.includes(m.id);
+          const soldOut = m.soldOut === true;
+          // Disable only when not currently selected — if the user had a
+          // stale selection from before the sold-out flip, leave the button
+          // tappable so they can switch off it. Single-select lists then
+          // auto-replace; multi-select needs an explicit deselect path
+          // (toggle handles this).
+          const disabled = soldOut && !sel;
           return (
             <button
               key={m.id}
               type="button"
-              onClick={() => toggle(m.id)}
+              disabled={disabled}
+              onClick={() => {
+                if (soldOut && !sel) return;
+                toggle(m.id);
+              }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                 sel
                   ? "bg-romolo-red text-white border-romolo-red"
+                  : soldOut
+                  ? "bg-black/[0.03] text-[#bdb8b1] border-romolo-border cursor-not-allowed line-through"
                   : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-red/40"
               }`}
             >
               {m.name}
-              {m.priceCents > 0 && (
+              {m.priceCents > 0 && !soldOut && (
                 <span className="opacity-80">+{fmt(m.priceCents)}</span>
               )}
+              {soldOut && <span className="text-[10px]">sold out</span>}
             </button>
           );
         })}

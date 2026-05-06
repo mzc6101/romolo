@@ -28,16 +28,18 @@ const CACHE_SECONDS = 900;
 // Bump the trailing version segment whenever the snapshot shape changes —
 // it abandons the prior cached entry so deploys don't serve stale snapshots
 // to a freshly deployed page (and to a dev server that's seen old data).
+// Tag the cache so the Square webhook handler can invalidate it via
+// revalidateTag("square-catalog") when sold-out / availability flips.
 const cachedCatalog = unstable_cache(
   async () => getCatalog(),
-  ["square-catalog", "v6"],
-  { revalidate: CACHE_SECONDS },
+  ["square-catalog", "v7"],
+  { revalidate: CACHE_SECONDS, tags: ["square-catalog"] },
 );
 
 const cachedHours = unstable_cache(
   async () => getOpenPeriods(),
-  ["square-hours", "v6"],
-  { revalidate: CACHE_SECONDS },
+  ["square-hours", "v7"],
+  { revalidate: CACHE_SECONDS, tags: ["square-catalog"] },
 );
 
 function emptySnapshot(): MenuSnapshot {

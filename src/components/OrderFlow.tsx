@@ -144,6 +144,13 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
     const sel = line.modifiers[ml.id] ?? [];
     if (sel.length < ml.minSelected) return false;
     if (ml.maxSelected != null && sel.length > ml.maxSelected) return false;
+    // If a previously selected modifier was marked sold-out by Square (likely
+    // via the catalog.version.updated webhook between page open and Continue),
+    // the line is invalid until the user picks a different option.
+    for (const id of sel) {
+      const mod = ml.modifiers.find((m) => m.id === id);
+      if (mod?.soldOut) return false;
+    }
   }
   return line.qty > 0;
 };
