@@ -59,6 +59,24 @@ function activeModifierLists(
 // pick one before sizes/modifiers render. Non-composite items have no filling
 // concept so fillingKey stays undefined for the lifetime of the line.
 
+// Modifier lists render in catalog order by default, which doesn't always
+// match the desired UX. Rank them here so:
+//   shell → filling → garnish (Ricotta structural choices, in that order)
+//   <other lists, in catalog order>     (e.g. Ice Cream Flavor)
+//   multiple boxes → special notes      (always last — packing + notes)
+// Suffix match so Square renames like "Cannoli Ricotta Shell" / "Cannoli
+// Multiple Boxes" still rank correctly. Non-matching lists keep their
+// relative order via JavaScript's stable sort.
+const modifierListRank = (name: string): number => {
+  const lc = name.toLowerCase().trim();
+  if (lc.endsWith("shell")) return -3;
+  if (lc.endsWith("filling")) return -2;
+  if (lc.endsWith("garnish")) return -1;
+  if (lc.endsWith("multiple boxes")) return 1;
+  if (lc.endsWith("special notes")) return 2;
+  return 0;
+};
+
 type Order = {
   date: string;
   time: string;
@@ -629,6 +647,9 @@ function OrderLineEditor({
   if (!item) return null;
   const variations = activeVariations(item, line.fillingKey);
   const modifierLists = activeModifierLists(item, line.fillingKey);
+  const orderedModifierLists = [...modifierLists].sort(
+    (a, b) => modifierListRank(a.name) - modifierListRank(b.name),
+  );
 
   const onItemChange = (id: string) => {
     const next = snapshot.items.find((i) => i.id === id);
@@ -745,7 +766,7 @@ function OrderLineEditor({
         />
       )}
 
-      {modifierLists.map((ml) => (
+      {orderedModifierLists.map((ml) => (
         <ModifierSet
           key={ml.id}
           list={ml}
