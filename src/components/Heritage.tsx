@@ -65,7 +65,7 @@ export default function Heritage() {
                 Romolo &amp; Angela made desserts at home in Vittoria, Sicily.
                 When they came to the Bay Area in the 1960s, they bought a
                 Swensen&apos;s Ice Cream Parlor, and Romolo&apos;s Cannoli took
-                shape as both gelateria and pasticceria—the nonni showcasing
+                shape as both gelateria and pasticceria, showcasing
                 Italian specialties like spumoni, amaretti, and cannoli, alongside
                 almond and hazelnut, and eventually ice cream cakes, tiramisu,
                 cookies, and our famous cannoli.
@@ -79,7 +79,7 @@ export default function Heritage() {
               </p>
               <p>
                 Sixty years later, the grandkids make everything the same
-                way—filled to order from the best ingredients available. Today we
+                way, filled to order from the best ingredients available. Today we
                 offer cannoli kits, pistachios, chocolate chips and toffee garnish,
                 alternative fillings like lemon, chocolate, pistachio and
                 hazelnut, and company catering delivered every day throughout
