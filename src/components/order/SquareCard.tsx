@@ -102,7 +102,7 @@ export function SquareCard({
     <div>
       <div
         ref={containerRef}
-        className="p-3 border border-romolo-border rounded-sm bg-white min-h-[60px]"
+        className="px-3 py-2 border border-romolo-border rounded-sm bg-white"
       />
       {status === "loading" && (
         <div className="mt-2 text-xs text-romolo-warm-gray">Loading secure card field…</div>

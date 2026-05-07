@@ -14,6 +14,7 @@ import OrderFlowMount from "@/components/OrderFlowMount";
 import FloatingOrderCTA from "@/components/FloatingOrderCTA";
 import { getCatalog } from "@/lib/square/catalog";
 import { getOpenPeriods } from "@/lib/square/hours";
+import { getLocationProfile } from "@/lib/square/location";
 import { squareLocationId } from "@/lib/square/client";
 import type { MenuSnapshot } from "@/lib/square/types";
 import { getReviews } from "@/lib/reviews";
@@ -42,6 +43,12 @@ const cachedHours = unstable_cache(
   { revalidate: CACHE_SECONDS, tags: ["square-catalog"] },
 );
 
+const cachedLocation = unstable_cache(
+  async () => getLocationProfile(),
+  ["square-location", "v1"],
+  { revalidate: CACHE_SECONDS, tags: ["square-catalog"] },
+);
+
 function emptySnapshot(): MenuSnapshot {
   return {
     fetchedAt: new Date().toISOString(),
@@ -49,18 +56,24 @@ function emptySnapshot(): MenuSnapshot {
     currency: "USD",
     items: [],
     hours: { byWeekday: {}, timezone: "America/Los_Angeles" },
+    location: { address: "", mapsQuery: "" },
   };
 }
 
 async function loadSnapshot(): Promise<MenuSnapshot> {
   try {
-    const [{ items }, hours] = await Promise.all([cachedCatalog(), cachedHours()]);
+    const [{ items }, hours, location] = await Promise.all([
+      cachedCatalog(),
+      cachedHours(),
+      cachedLocation(),
+    ]);
     return {
       fetchedAt: new Date().toISOString(),
       locationId: squareLocationId(),
       currency: "USD",
       items,
       hours,
+      location,
     };
   } catch (err) {
     if (process.env.NODE_ENV !== "production") {

@@ -161,7 +161,6 @@ type Order = {
   lines: OrderLine[];
   fulfillment: "pickup";
   contact: Contact;
-  cardOk: boolean;
   confirmation: string;
 };
 
@@ -244,7 +243,6 @@ const initialOrder = (): Order => ({
   lines: [],
   fulfillment: "pickup",
   contact: { name: "", phone: "", email: "" },
-  cardOk: false,
   confirmation: "",
 });
 
@@ -318,7 +316,7 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
   return line.qty > 0;
 };
 
-const STEP_LABELS = ["When", "What", "How", "Pay"] as const;
+const STEP_LABELS = ["When", "What", "How", "Review", "Pay"] as const;
 
 export default function OrderFlow() {
   const { isOpen, close, snapshot } = useOrder();
@@ -340,7 +338,7 @@ export default function OrderFlow() {
 
   if (!isOpen) return null;
 
-  const next = () => setStep((s) => Math.min(s + 1, 4));
+  const next = () => setStep((s) => Math.min(s + 1, 5));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const placeOrder = async () => {
@@ -379,7 +377,7 @@ export default function OrderFlow() {
 
     if (result.status === "ok") {
       setOrder({ ...order, confirmation: result.confirmation });
-      setStep(4);
+      setStep(5);
       return;
     }
     if (result.status === "card_declined") {
@@ -404,7 +402,11 @@ export default function OrderFlow() {
     if (step === 2) return order.fulfillment === "pickup";
     if (step === 3)
       return (
-        order.cardOk &&
+        order.lines.length > 0 &&
+        order.lines.every((l) => lineValid(l, snapshot))
+      );
+    if (step === 4)
+      return (
         !!cardHandle &&
         !!order.contact.email &&
         !!order.contact.name
@@ -424,7 +426,7 @@ export default function OrderFlow() {
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-md w-full flex flex-col overflow-hidden"
         style={{
-          maxWidth: step === 4 ? 520 : 760,
+          maxWidth: step === 5 ? 520 : 760,
           maxHeight: "90vh",
           animation: "overlay-pop 0.4s var(--ease-out-expo)",
         }}
@@ -435,7 +437,7 @@ export default function OrderFlow() {
             <div className="font-[var(--font-serif)] text-xl sm:text-[22px] font-semibold text-romolo-red whitespace-nowrap">
               Romolo&apos;s
             </div>
-            {step < 4 && (
+            {step < 5 && (
               <Stepper
                 steps={STEP_LABELS as unknown as string[]}
                 current={step}
@@ -457,7 +459,8 @@ export default function OrderFlow() {
           {step === 0 && <StepWhen order={order} setOrder={setOrder} />}
           {step === 1 && <StepWhat order={order} setOrder={setOrder} />}
           {step === 2 && <StepHow order={order} />}
-          {step === 3 && (
+          {step === 3 && <StepReview order={order} setOrder={setOrder} />}
+          {step === 4 && (
             <StepPay
               order={order}
               setOrder={setOrder}
@@ -465,11 +468,11 @@ export default function OrderFlow() {
               errorBanner={errorBanner}
             />
           )}
-          {step === 4 && <StepDone order={order} onClose={close} />}
+          {step === 5 && <StepDone order={order} onClose={close} />}
         </div>
 
         {/* Footer */}
-        {step < 4 && (
+        {step < 5 && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 sm:px-6 border-t border-romolo-border bg-romolo-cream">
             <OrderSummary order={order} snapshot={snapshot} />
             <div className="flex gap-2.5">
@@ -483,7 +486,7 @@ export default function OrderFlow() {
               )}
               <button
                 onClick={() => {
-                  if (step === 3) {
+                  if (step === 4) {
                     placeOrder();
                   } else {
                     next();
@@ -492,7 +495,7 @@ export default function OrderFlow() {
                 disabled={!canAdvance || submitting}
                 className="px-6 py-3 text-[12px] font-bold tracking-[0.15em] uppercase bg-romolo-red text-white hover:bg-romolo-red-dark transition-colors disabled:bg-[#d8d4ce] disabled:cursor-not-allowed rounded-sm"
               >
-                {step === 3 ? (submitting ? "Placing..." : "Place order") : "Continue"}
+                {step === 4 ? (submitting ? "Placing..." : "Place order") : "Continue"}
               </button>
             </div>
           </div>
@@ -570,6 +573,34 @@ function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
+// Required prep buffer between "now" and the earliest selectable pickup time.
+// 30 min lets staff queue up the order — anything tighter and a 2:13pm walk-in
+// could grab a 2:15pm slot before we know it exists.
+const PICKUP_LEAD_MINUTES = 30;
+
+// Returns the current date (YYYY-MM-DD) and minutes-since-midnight in the
+// shop's timezone. Built off the snapshot's IANA tz so the cutoff is correct
+// regardless of the user's device tz (a phone in NYC ordering from CA must
+// see California "now", not Eastern).
+function nowInTimezone(timezone: string): { dateIso: string; minutes: number } {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(new Date()).map((p) => [p.type, p.value])
+  );
+  const dateIso = `${parts.year}-${parts.month}-${parts.day}`;
+  const hour = Number(parts.hour) % 24;
+  const minutes = hour * 60 + Number(parts.minute);
+  return { dateIso, minutes };
+}
+
 // ─────────── Step 1: When ───────────
 function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
   const { snapshot } = useOrder();
@@ -612,12 +643,18 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
       const h12 = h % 12 || 12;
       return `${h12}:${String(m).padStart(2, "0")}${ampm}`;
     };
+    // For today (in the shop's tz) skip slots at or before now + lead time.
+    // Any other date sees every open-hours slot.
+    const now = nowInTimezone(snapshot.hours.timezone);
+    const dIso = fmtDate(d);
+    const cutoffMin = dIso === now.dateIso ? now.minutes + PICKUP_LEAD_MINUTES : -1;
     for (const p of periods) {
       const [sh, sm] = p.openLocal.split(":").map(Number);
       const [eh, em] = p.closeLocal.split(":").map(Number);
       const startMin = sh * 60 + sm;
       const endMin = eh * 60 + em;
       for (let t = startMin; t + 30 <= endMin; t += 30) {
+        if (t < cutoffMin) continue;
         slots.push(fmt12(Math.floor(t / 60), t % 60));
       }
     }
@@ -625,6 +662,21 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
   };
 
   const selectedDate = order.date ? new Date(order.date + "T00:00:00") : null;
+  const slots = selectedDate ? timeSlots(selectedDate) : [];
+
+  // If the wall clock crosses the cutoff while the modal is open, the
+  // currently-selected time can become invalid. Clear it so Continue blocks
+  // until the user re-picks. Re-evaluates whenever the slot list changes
+  // (which itself recomputes on every render off `now`).
+  useEffect(() => {
+    if (!order.time) return;
+    if (slots.length > 0 && !slots.includes(order.time)) {
+      setOrder({ ...order, time: "", timeAvailable: false });
+    }
+    // We intentionally only depend on the join of slots — including `order`
+    // as a dep would loop because we mutate it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots.join("|"), order.time]);
 
   return (
     <div>
@@ -677,27 +729,33 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
           <h4 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-3">
             Pick up time
           </h4>
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}
-          >
-            {timeSlots(selectedDate).map((t) => {
-              const sel = order.time === t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => setOrder({ ...order, time: t, timeAvailable: true })}
-                  className={`py-2.5 rounded-sm text-[13px] font-medium transition-all border ${
-                    sel
-                      ? "bg-romolo-red text-white border-romolo-red"
-                      : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
+          {slots.length === 0 ? (
+            <p className="text-sm text-romolo-warm-gray italic">
+              No pickup times left today — try tomorrow.
+            </p>
+          ) : (
+            <div
+              className="grid gap-2"
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}
+            >
+              {slots.map((t) => {
+                const sel = order.time === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setOrder({ ...order, time: t, timeAvailable: true })}
+                    className={`py-2.5 rounded-sm text-[13px] font-medium transition-all border ${
+                      sel
+                        ? "bg-romolo-red text-white border-romolo-red"
+                        : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <p className="text-xs text-romolo-warm-gray mt-4 italic">
             Need a window outside our hours? Call us at{" "}
             <a href="tel:+16505740625" className="text-romolo-red underline">
@@ -726,31 +784,55 @@ function StepWhat({
       ...order,
       lines: order.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
     });
-  const removeLine = (id: string) =>
-    setOrder({ ...order, lines: order.lines.filter((l) => l.id !== id) });
+  // Single accordion: one expanded line at a time. New lines (and the
+  // initial auto-added line) become the expanded one so the user lands
+  // straight in the picker. Selecting a collapsed line expands it and
+  // collapses every other.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const removeLine = (id: string) => {
+    const remaining = order.lines.filter((l) => l.id !== id);
+    setOrder({ ...order, lines: remaining });
+    if (expandedId === id) {
+      setExpandedId(remaining[remaining.length - 1]?.id ?? null);
+    }
+  };
+
+  // Adds a blank "pick an item" row. The user picks a category and item from
+  // the empty-state grid inside OrderLineEditor; that selection seeds the
+  // variation + modifier defaults via onItemChange. We deliberately don't
+  // pre-select anything — the user explicitly asked to start from scratch.
   const addLine = () => {
-    const firstItem = snapshot.items[0];
-    if (!firstItem) return;
-    const seed = buildLineSeedForItem(firstItem);
+    const newId = lineId();
     setOrder({
       ...order,
       lines: [
         ...order.lines,
         {
-          id: lineId(),
-          itemId: firstItem.id,
+          id: newId,
+          itemId: "",
           fillingKey: undefined,
-          ...seed,
+          variationId: "",
+          qty: 1,
+          modifiers: {},
+          freeText: {},
         },
       ],
     });
+    setExpandedId(newId);
   };
 
-  // Auto-add a first line when modal opens with empty cart
-  if (order.lines.length === 0 && snapshot.items.length > 0) {
-    setTimeout(addLine, 0);
-  }
+  // Open the modal with one empty picker already on screen so the user has
+  // somewhere to start. If lines exist already (back navigation from Review,
+  // out-of-stock bounce-back), keep the most recent one expanded.
+  useEffect(() => {
+    if (order.lines.length === 0) {
+      addLine();
+    } else if (!expandedId) {
+      setExpandedId(order.lines[order.lines.length - 1].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div>
@@ -758,7 +840,7 @@ function StepWhat({
         title="What do you want?"
         subtitle="Pick items, sizes, and any options. Add as many as you'd like."
       />
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {order.lines.map((line, idx) => (
           <OrderLineEditor
             key={line.id}
@@ -766,6 +848,8 @@ function StepWhat({
             onChange={(patch) => updateLine(line.id, patch)}
             onRemove={order.lines.length > 1 ? () => removeLine(line.id) : null}
             index={idx}
+            expanded={line.id === expandedId}
+            onExpand={() => setExpandedId(line.id)}
           />
         ))}
       </div>
@@ -779,25 +863,95 @@ function StepWhat({
   );
 }
 
+// Curated front-of-house grouping for the order picker. Square's own
+// categories don't map cleanly to how the menu reads on the home page, so
+// the layout is hardcoded here. Lookup is by exact item name against the
+// live snapshot — items missing from Square (e.g. seasonal removal) are
+// silently skipped, and a category that ends up empty is hidden.
+const PICKER_CATEGORIES: Array<{ title: string; items: string[] }> = [
+  { title: "Cannoli", items: ["Cannoli", "Cannoli Set", "Cannoli Kit"] },
+  {
+    title: "Desserts",
+    items: ["Chocolate Banana", "Cookies", "Spumoni Wedge", "Tartufi", "Tiramisu"],
+  },
+  { title: "Frozen Treats", items: ["Ice Cream", "Milkshake"] },
+];
+
+// Empty-state picker shown inside an OrderLineEditor before the user has
+// chosen anything. Three stacked rows (Cannoli / Desserts / Frozen Treats),
+// each row a red underlined heading with the items beneath.
+function ItemPicker({ onPick }: { onPick: (item: SnapshotItem) => void }) {
+  const { snapshot } = useOrder();
+  const byName = useMemo(() => {
+    const m = new Map<string, SnapshotItem>();
+    for (const it of snapshot.items) m.set(it.name, it);
+    return m;
+  }, [snapshot.items]);
+
+  const sections = PICKER_CATEGORIES.map((cat) => ({
+    title: cat.title,
+    items: cat.items
+      .map((name) => byName.get(name))
+      .filter((it): it is SnapshotItem => !!it),
+  })).filter((s) => s.items.length > 0);
+
+  if (sections.length === 0) {
+    return (
+      <div className="text-sm text-romolo-warm-gray italic">
+        Menu is loading — try again in a moment.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {sections.map((section) => (
+        <div key={section.title}>
+          <h5 className="font-[var(--font-serif)] text-[20px] font-medium text-romolo-red border-b border-romolo-red/40 pb-1.5 mb-3">
+            {section.title}
+          </h5>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {section.items.map((it) => (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => onPick(it)}
+                className="px-3 py-3 rounded-sm border border-romolo-border bg-romolo-cream hover:border-romolo-red hover:bg-white transition-colors text-left"
+              >
+                <span className="block font-[var(--font-serif)] text-[16px] sm:text-[17px] font-medium leading-tight text-romolo-charcoal">
+                  {it.name}
+                </span>
+                {it.description && (
+                  <span className="block mt-1 text-[11px] text-romolo-warm-gray line-clamp-2">
+                    {it.description}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function OrderLineEditor({
   line,
   onChange,
   onRemove,
   index,
+  expanded,
+  onExpand,
 }: {
   line: OrderLine;
   onChange: (patch: Partial<OrderLine>) => void;
   onRemove: (() => void) | null;
   index: number;
+  expanded: boolean;
+  onExpand: () => void;
 }) {
   const { snapshot } = useOrder();
   const item = snapshot.items.find((i) => i.id === line.itemId);
-  if (!item) return null;
-  const variations = activeVariations(item, line.fillingKey);
-  const modifierLists = activeModifierLists(item, line.fillingKey, line.setMode);
-  const orderedModifierLists = [...modifierLists].sort(
-    (a, b) => modifierListRank(a.name) - modifierListRank(b.name),
-  );
 
   const onItemChange = (id: string) => {
     const next = snapshot.items.find((i) => i.id === id);
@@ -809,6 +963,99 @@ function OrderLineEditor({
       ...seed,
     });
   };
+
+  // Collapsed view — only one line is expanded at a time. Click anywhere on
+  // the row (other than the remove ×) to expand. Empty-state lines collapse
+  // too; their headline reads "pick something" so the affordance stays clear.
+  if (!expanded) {
+    // Set items already encode their qty in the size label (6 / 12 / 24)
+    // surfaced via summarizeLine, so we suppress "× N" there to avoid
+    // double-counting. Everything else gets the qty inline.
+    const headline = item
+      ? `${item.name}${!item.set ? ` × ${line.qty}` : ""}`
+      : `Item ${index + 1} — pick something`;
+    const summary = item ? summarizeLine(line, item) : "";
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onExpand}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onExpand();
+          }
+        }}
+        className="flex items-center justify-between gap-3 px-4 py-3 border border-romolo-border rounded-sm bg-white hover:border-romolo-red/60 transition-colors cursor-pointer"
+      >
+        <div className="flex items-baseline gap-2 min-w-0 flex-1">
+          <span className="font-[var(--font-serif)] text-[16px] font-medium text-romolo-charcoal truncate">
+            {headline}
+          </span>
+          {summary && (
+            <span className="text-[12px] text-romolo-warm-gray truncate">
+              · {summary}
+            </span>
+          )}
+        </div>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            aria-label="Remove"
+            className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5 shrink-0"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Empty-state line (expanded): user hasn't picked an item yet. Show the
+  // category-grouped picker. Once they click a card, onItemChange seeds the
+  // line and the normal editor renders below.
+  if (!item) {
+    return (
+      <div className="border border-romolo-border rounded-sm p-4 bg-white">
+        <div className="flex items-start justify-between gap-3 mb-3.5">
+          <div className="text-[10px] tracking-[0.15em] uppercase text-romolo-warm-gray">
+            Item {index + 1} — pick something
+          </div>
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              aria-label="Remove"
+              className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <ItemPicker onPick={(it) => onItemChange(it.id)} />
+      </div>
+    );
+  }
+
+  const variations = activeVariations(item, line.fillingKey);
+  const modifierLists = activeModifierLists(item, line.fillingKey, line.setMode);
+  const orderedModifierLists = [...modifierLists].sort(
+    (a, b) => modifierListRank(a.name) - modifierListRank(b.name),
+  );
+
+  const clearItem = () =>
+    onChange({
+      itemId: "",
+      fillingKey: undefined,
+      variationId: "",
+      qty: 1,
+      modifiers: {},
+      freeText: {},
+      setMode: undefined,
+    });
 
   const onFillingChange = (key: string) => {
     if (!item.cannoliFillings) return;
@@ -916,17 +1163,18 @@ function OrderLineEditor({
           <div className="text-[10px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1">
             Item {index + 1}
           </div>
-          <select
-            value={line.itemId}
-            onChange={(e) => onItemChange(e.target.value)}
-            className="w-full max-w-[360px] px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal focus:outline-none focus:border-romolo-red/40 appearance-none"
-          >
-            {snapshot.items.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <div className="font-[var(--font-serif)] text-[20px] sm:text-[22px] font-medium text-romolo-charcoal">
+              {item.name}
+            </div>
+            <button
+              type="button"
+              onClick={clearItem}
+              className="text-[11px] tracking-[0.12em] uppercase text-romolo-warm-gray hover:text-romolo-red transition-colors underline-offset-4 hover:underline"
+            >
+              Change
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -1152,6 +1400,16 @@ function QtyStepper({
 
 // ─────────── Step 3: How ───────────
 function StepHow({ order }: { order: Order }) {
+  const { snapshot } = useOrder();
+  // Square is the source of truth for the storefront address. Fall back to
+  // the legacy hardcoded line if the snapshot couldn't load location data —
+  // the empty-snapshot path returns "" for both fields.
+  const address =
+    snapshot.location.address || "81 W. 37th Ave, San Mateo CA 94403";
+  const directionsHref = snapshot.location.mapsQuery
+    ? `https://www.google.com/maps/dir/?api=1&destination=${snapshot.location.mapsQuery}`
+    : null;
+
   return (
     <div>
       <StepHeader
@@ -1162,7 +1420,7 @@ function StepHow({ order }: { order: Order }) {
       <div className="p-5 bg-romolo-cream border border-romolo-border rounded-sm">
         <div className="text-[28px] mb-2">🛍️</div>
         <div className="font-[var(--font-serif)] text-[22px] font-medium mb-1.5">
-          81 W. 37th Ave, San Mateo CA 94403
+          {address}
         </div>
         <div className="text-[13px] text-romolo-warm-gray leading-relaxed mb-3">
           Look for the red awning. Free street parking out front.
@@ -1171,6 +1429,16 @@ function StepHow({ order }: { order: Order }) {
           <strong>Pickup window:</strong>{" "}
           {order.date && order.time ? `${order.date} at ${order.time}` : "—"}
         </div>
+        {directionsHref && (
+          <a
+            href={directionsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 text-[12px] font-bold tracking-[0.15em] uppercase border border-romolo-border bg-white text-romolo-charcoal hover:border-romolo-red hover:text-romolo-red transition-colors rounded-sm"
+          >
+            Get directions →
+          </a>
+        )}
       </div>
 
       <p className="text-xs text-romolo-warm-gray mt-4 italic">
@@ -1184,7 +1452,139 @@ function StepHow({ order }: { order: Order }) {
   );
 }
 
-// ─────────── Step 4: Pay ───────────
+// ─────────── Step 4: Review ───────────
+// Read-only cart summary right before payment. Per UX feedback the user can
+// only delete lines here — qty / filling / modifier edits stay on the What
+// step so the editor isn't duplicated. The footer's OrderSummary continues
+// to render the live Square-calculated totals (subtotal / discounts / kit
+// fee), so this body deliberately omits its own price column.
+function StepReview({
+  order,
+  setOrder,
+}: {
+  order: Order;
+  setOrder: (o: Order) => void;
+}) {
+  const { snapshot } = useOrder();
+  const removeLine = (id: string) =>
+    setOrder({ ...order, lines: order.lines.filter((l) => l.id !== id) });
+
+  const prettyDate = (s: string) => {
+    if (!s) return "";
+    const d = new Date(s + "T00:00:00");
+    return d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  return (
+    <div>
+      <StepHeader title="Look good?" subtitle="Quick review before you pay." />
+
+      <div className="p-4 bg-romolo-cream border border-romolo-border rounded-sm mb-5">
+        <div className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
+          Pickup
+        </div>
+        <div className="font-[var(--font-serif)] text-[20px] font-medium text-romolo-charcoal">
+          {prettyDate(order.date)} · {order.time}
+        </div>
+        {snapshot.location.address && (
+          <div className="text-[13px] text-romolo-warm-gray mt-1">
+            {snapshot.location.address}
+          </div>
+        )}
+      </div>
+
+      {order.lines.length === 0 ? (
+        <p className="text-sm text-romolo-warm-gray italic">
+          Your cart is empty. Go back to <em>What</em> to add items.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {order.lines.map((line) => {
+            const item = snapshot.items.find((i) => i.id === line.itemId);
+            if (!item) return null;
+            const summary = summarizeLine(line, item);
+            return (
+              <div
+                key={line.id}
+                className="flex items-start justify-between gap-3 p-4 border border-romolo-border rounded-sm bg-white"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-[var(--font-serif)] text-[18px] text-romolo-charcoal">
+                    {item.name}
+                    {!item.set ? ` × ${line.qty}` : ""}
+                  </div>
+                  {summary && (
+                    <div className="text-[12px] text-romolo-warm-gray mt-0.5">
+                      {summary}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => removeLine(line.id)}
+                  aria-label="Remove"
+                  className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One-line description of a configured line for read-only display. Resolves
+// modifier ids → modifier names against the same active-list logic the
+// editor uses, so what the user sees here matches what they configured.
+function summarizeLine(line: OrderLine, item: SnapshotItem): string {
+  const parts: string[] = [];
+
+  // Set lines: size label is implicit in the item (Cannoli Set), but mode
+  // (Default vs Customize) is meaningful to surface.
+  if (item.set) {
+    const opt = findSetOption(item, line);
+    if (opt) parts.push(opt.label);
+    if (line.setMode === "customize") {
+      const filling = item.cannoliFillings?.find((f) => f.key === line.fillingKey);
+      if (filling) parts.push(`Customize · ${filling.label}`);
+    } else {
+      parts.push("Default recipe");
+    }
+  } else if (item.cannoliFillings) {
+    const filling = item.cannoliFillings.find((f) => f.key === line.fillingKey);
+    if (filling) parts.push(filling.label);
+  }
+
+  const variations = activeVariations(item, line.fillingKey);
+  if (!item.set && variations.length > 1) {
+    const v = variations.find((x) => x.id === line.variationId);
+    if (v) parts.push(v.name);
+  }
+
+  const modifierLists = activeModifierLists(item, line.fillingKey, line.setMode);
+  for (const ml of modifierLists) {
+    if (ml.modifierType === "text") {
+      const text = (line.freeText[ml.id] ?? "").trim();
+      if (text) parts.push(`${ml.name}: ${text}`);
+      continue;
+    }
+    const sel = line.modifiers[ml.id] ?? [];
+    const names = sel
+      .map((id) => ml.modifiers.find((m) => m.id === id)?.name)
+      .filter((n): n is string => !!n);
+    if (names.length > 0) parts.push(names.join(", "));
+  }
+
+  return parts.join(" · ");
+}
+
+// ─────────── Step 5: Pay ───────────
 function StepPay({
   order,
   setOrder,
@@ -1246,15 +1646,6 @@ function StepPay({
         Card details
       </h5>
       <SquareCard onReady={(h) => setCardHandle(h)} />
-
-      <label className="text-xs text-romolo-warm-gray flex gap-2 items-center mt-3">
-        <input
-          type="checkbox"
-          checked={order.cardOk}
-          onChange={(e) => setOrder({ ...order, cardOk: e.target.checked })}
-        />
-        I agree to the order — my card will be charged on submit.
-      </label>
     </div>
   );
 }
@@ -1330,19 +1721,6 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
     return JSON.stringify(valid.map((l) => buildLinePayload(l, snapshot)));
   }, [order.lines, snapshot]);
 
-  // Aggregate kit count from valid lines for the "Cannoli Kit × N" caption.
-  // Cheap derivation; not worth round-tripping through Square just to label.
-  const kitCount = useMemo(() => {
-    let n = 0;
-    for (const l of order.lines) {
-      const item = snapshot.items.find((i) => i.id === l.itemId);
-      if (!item?.kit) continue;
-      if (!lineValid(l, snapshot)) continue;
-      n += Math.floor(l.qty / item.kit.groupSize);
-    }
-    return n;
-  }, [order.lines, snapshot]);
-
   useEffect(() => {
     if (!payloadKey) {
       setTotals(null);
@@ -1384,50 +1762,14 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
     };
   }, [payloadKey]);
 
-  const subtotalCents = totals?.subtotalCents ?? 0;
-  const kitFeeCents = totals?.kitFeeCents ?? 0;
-  const discountCents = totals?.discountCents ?? 0;
   const totalCents = totals?.totalCents ?? 0;
-  const applied = totals?.applied ?? [];
-  const showBreakdown = discountCents > 0 || kitFeeCents > 0;
 
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
-      {showBreakdown ? (
-        <>
-          <div className="flex items-baseline justify-between gap-3 text-[11px]">
-            <span>Subtotal</span>
-            <span className="tabular-nums">{fmtCents(subtotalCents)}</span>
-          </div>
-          {applied.map(({ name, amountCents }) => (
-            <div
-              key={name}
-              className="flex items-baseline justify-between gap-3 text-[11px] text-romolo-red"
-              title={name}
-            >
-              <span className="truncate max-w-[180px]">{name}</span>
-              <span className="tabular-nums">−{fmtCents(amountCents)}</span>
-            </div>
-          ))}
-          {kitFeeCents > 0 && (
-            <div className="flex items-baseline justify-between gap-3 text-[11px]">
-              <span>Cannoli Kit{kitCount > 1 ? ` × ${kitCount}` : ""}</span>
-              <span className="tabular-nums">+{fmtCents(kitFeeCents)}</span>
-            </div>
-          )}
-          <div className="text-[11px] tracking-[0.15em] uppercase mt-1">Total</div>
-          <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal leading-none">
-            {fmtCents(totalCents)}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>
-          <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal">
-            {fmtCents(totalCents)}
-          </div>
-        </>
-      )}
+      <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>
+      <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal">
+        {fmtCents(totalCents)}
+      </div>
     </div>
   );
 }

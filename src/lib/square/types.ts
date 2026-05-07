@@ -9,6 +9,16 @@ export type MenuSnapshot = {
   currency: "USD";
   items: SnapshotItem[];
   hours: OpenPeriods;
+  location: LocationProfile;
+};
+
+// Display-ready location info derived from Square's `locations.get`. `address`
+// is a single human-readable line for rendering; `mapsQuery` is what to drop
+// after `?destination=` in the Google Maps directions URL — coordinates when
+// Square has them (most reliable), falling back to the URL-encoded address.
+export type LocationProfile = {
+  address: string;
+  mapsQuery: string;
 };
 
 export type SnapshotItem = {
