@@ -62,20 +62,28 @@ export default function Heritage() {
             </h3>
             <div className="space-y-5 text-romolo-warm-gray leading-relaxed">
               <p>
-                Romolo learned to fold ricotta from his mother in a stone kitchen
-                outside Palermo. When he came west in &apos;68, he brought one
-                handwritten recipe and a metal cannolo tube wrapped in cloth.
+                Romolo &amp; Angela made desserts at home in Vittoria, Sicily.
+                When they came to the Bay Area in the 1960s, they bought a
+                Swensen&apos;s Ice Cream Parlor, and Romolo&apos;s Cannoli took
+                shape as both gelateria and pasticceria—the nonni showcasing
+                Italian specialties like spumoni, amaretti, and cannoli, alongside
+                almond and hazelnut, and eventually ice cream cakes, tiramisu,
+                cookies, and our famous cannoli.
               </p>
               <p>
-                Sixty years later, his grandkids still fry every shell to order
-                on the same flat-top in the back. Aaron pipes ricotta the way
-                Romolo taught him — from a fold in a square of parchment, never
-                from a bag.
+                As bakeries in the Bay Area started closing, Romolo&apos;s
+                quickly became the go-to for an authentic Sicilian-Italian
+                gelateria and pasticceria. In 2007, Romolo and Angela retired and
+                handed their masterpiece to their grandson Joey. The
+                creativeness of Joey helped mix tradition with current demands.
               </p>
               <p>
-                We don&apos;t make cannoli ahead. We don&apos;t make them in
-                batches. We make them when you order them, and we make them the
-                same way we always have.
+                Sixty years later, the grandkids make everything the same
+                way—filled to order from the best ingredients available. Today we
+                offer cannoli kits, pistachios, chocolate chips and toffee garnish,
+                alternative fillings like lemon, chocolate, pistachio and
+                hazelnut, and company catering delivered every day throughout
+                the Bay Area in our electric cars.
               </p>
             </div>
 

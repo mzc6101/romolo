@@ -23,8 +23,7 @@ export default function Hero() {
             </h1>
 
             <p className="font-[var(--font-serif)] text-lg md:text-xl text-[#5a6b5e] font-light italic max-w-lg mb-10">
-              &ldquo;Quote — Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-              Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.&rdquo;
+              Best cannoli in the bay!
             </p>
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
