@@ -95,6 +95,15 @@ export type SetOption = {
   // variationId, so this is purely for the UI subtotal display.
   priceCents: number;
   inStock: boolean;
+  // Ice Cream equivalent for this size, used by Customize mode when the
+  // user switches the filling type. Omitted when the Ice Cream item lacks a
+  // matching variation (Customize → Ice Cream chip will then reflect the
+  // size as out-of-stock for that filling).
+  iceCream?: {
+    variationId: string;
+    priceCents: number;
+    inStock: boolean;
+  };
 };
 
 // Modifier auto-applied to every Cannoli Set line (Filling=Ricotta,

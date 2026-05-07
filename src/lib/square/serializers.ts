@@ -1,5 +1,6 @@
 import type {
   AutoModifierRef,
+  CannoliFilling,
   SetInfo,
   SetOption,
   SnapshotDiscount,
@@ -129,7 +130,7 @@ export function mergeCannoliItems(
             resolveKitInfo(iceCream!, ricotta!, options),
           ),
         );
-        const setComposite = buildSetComposite(ricotta!, options);
+        const setComposite = buildSetComposite(iceCream!, ricotta!, options);
         if (setComposite) result.push(setComposite);
         compositeEmitted = true;
       }
@@ -284,9 +285,17 @@ function stripReservedModifierOptions(
 
 // Resolves the Cannoli Set composite from the Ricotta item. Returns null
 // (no error) when any of the three auto modifiers, the Special Notes list,
-// or one of the size variations can't be resolved — the rest of the menu
-// keeps working and the operator gets a console warning.
+// or one of the size variations can't be resolved on Ricotta — the rest of
+// the menu keeps working and the operator gets a console warning.
+//
+// The Ice Cream item is consulted only for Customize-mode plumbing:
+// `cannoliFillings` carries both Ricotta and Ice Cream branches, and each
+// SetOption gets an optional `iceCream` variation ref. Missing Ice Cream
+// data degrades Customize → Ice Cream gracefully (sizes without a matching
+// Ice Cream variation are flagged out-of-stock for that filling) but never
+// blocks the set composite from emitting.
 function buildSetComposite(
+  iceCream: SnapshotItem,
   ricotta: SnapshotItem,
   options: {
     setCompositeId: string;
@@ -301,6 +310,8 @@ function buildSetComposite(
       variationPrefix: string;
       qty: number;
     }>;
+    kitModifierListName: string;
+    multipleBoxesModifierListName: string;
     specialNotesListNameSuffix: string;
   },
 ): SnapshotItem | null {
@@ -344,6 +355,11 @@ function buildSetComposite(
       );
       return null;
     }
+    // Ice Cream equivalent — optional. Customize → Ice Cream uses this when
+    // present; absent means the size is unavailable on Ice Cream.
+    const iceCreamVariation = iceCream.variations.find((v) =>
+      v.name.toLowerCase().trim().startsWith(spec.variationPrefix),
+    );
     setOptions.push({
       key: spec.key,
       label: spec.label,
@@ -351,6 +367,15 @@ function buildSetComposite(
       qty: spec.qty,
       priceCents: variation.priceCents,
       inStock: variation.inStock,
+      ...(iceCreamVariation
+        ? {
+            iceCream: {
+              variationId: iceCreamVariation.id,
+              priceCents: iceCreamVariation.priceCents,
+              inStock: iceCreamVariation.inStock,
+            },
+          }
+        : {}),
     });
   }
 
@@ -366,6 +391,38 @@ function buildSetComposite(
     return null;
   }
 
+  // Build per-filling modifier lists for Customize mode. Strip:
+  //   - "Cannoli Multiple Boxes" — a set is one packaged unit.
+  //   - "Cannoli Kit" — vestigial modifier reserved for the Kit composite.
+  //   - any TEXT (Special Notes) list — the top-level Set Special Notes
+  //     list already covers it; rendering it twice would confuse the user.
+  // Mixed Garnish is intentionally NOT stripped here — it's the only
+  // surface where customers can pick that option.
+  const stripBoxesKitAndText = (lists: SnapshotModifierList[]) =>
+    lists.filter(
+      (ml) =>
+        ml.name !== options.multipleBoxesModifierListName &&
+        ml.name !== options.kitModifierListName &&
+        ml.modifierType !== "text",
+    );
+
+  const cannoliFillings: CannoliFilling[] = [
+    {
+      key: "ice_cream",
+      label: "Ice Cream",
+      squareItemId: iceCream.id,
+      variations: iceCream.variations,
+      modifierLists: stripBoxesKitAndText(iceCream.modifierLists),
+    },
+    {
+      key: "ricotta",
+      label: "Ricotta",
+      squareItemId: ricotta.id,
+      variations: ricotta.variations,
+      modifierLists: stripBoxesKitAndText(ricotta.modifierLists),
+    },
+  ];
+
   const set: SetInfo = { options: setOptions, autoModifiers };
 
   return {
@@ -375,6 +432,7 @@ function buildSetComposite(
     categoryName: ricotta.categoryName,
     variations: [],
     modifierLists: [specialNotesList],
+    cannoliFillings,
     set,
   };
 }

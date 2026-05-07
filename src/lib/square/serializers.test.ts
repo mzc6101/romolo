@@ -656,6 +656,8 @@ describe("mergeCannoliItems", () => {
         shellList(),
         fillingList(),
         garnishListWithMixed(),
+        boxesListOn("ML_RIC_BOXES"),
+        kitListOn("ML_RIC_KIT"),
         specialNotesList(),
       ],
       ...overrides,
@@ -694,6 +696,58 @@ describe("mergeCannoliItems", () => {
       ],
     });
 
+  // Richer Ice Cream factory used by Customize tests. Includes Multiple
+  // Boxes and Special Notes lists so the Set composite's strip rules are
+  // exercised.
+  const setIceCreamRich = (): SnapshotItem =>
+    mkItem({
+      id: "I_IC",
+      name: ICE_CREAM,
+      variations: [
+        {
+          id: "V_IC_FULL",
+          name: "Full Size",
+          priceCents: 700,
+          inStock: true,
+          pickupEnabled: true,
+        },
+        {
+          id: "V_IC_MINI",
+          name: "Mini Size",
+          priceCents: 400,
+          inStock: true,
+          pickupEnabled: true,
+        },
+      ],
+      modifierLists: [
+        {
+          id: "ML_IC_FLAVOR",
+          name: "Cannoli Ice Cream Flavor",
+          modifierType: "list",
+          selectionType: "SINGLE",
+          minSelected: 1,
+          maxSelected: 1,
+          modifiers: [
+            { id: "M_IC_VAN", name: "Vanilla", priceCents: 0 },
+            { id: "M_IC_CHOC", name: "Chocolate", priceCents: 0 },
+          ],
+        },
+        boxesListOn("ML_IC_BOXES"),
+        kitListOn("ML_IC_KIT"),
+        {
+          id: "ML_IC_NOTES",
+          name: "Cannoli Special Notes",
+          modifierType: "text",
+          selectionType: "SINGLE",
+          minSelected: 0,
+          maxSelected: 1,
+          modifiers: [],
+          maxLength: 150,
+          textRequired: false,
+        },
+      ],
+    });
+
   describe("Cannoli Set composite", () => {
     it("emits the set composite when Ricotta has all three auto modifiers + Special Notes", () => {
       const items = [setIceCream(), setRicotta()];
@@ -705,7 +759,7 @@ describe("mergeCannoliItems", () => {
       ]);
       const set = result[2];
       expect(set.name).toBe("Cannoli Set");
-      expect(set.cannoliFillings).toBeUndefined();
+      expect(set.cannoliFillings).toBeDefined();
       expect(set.kit).toBeUndefined();
       expect(set.set).toBeDefined();
     });
@@ -721,11 +775,14 @@ describe("mergeCannoliItems", () => {
     it("set options resolve to the Full / Mini Ricotta variations with correct qtys and prices", () => {
       const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
       const set = result[2];
+      const ic = (id: string, priceCents: number) => ({
+        iceCream: { variationId: id, priceCents, inStock: true },
+      });
       expect(set.set!.options).toEqual([
-        { key: "6_full", label: "6 Full Size", variationId: "V_RIC_FULL", qty: 6, priceCents: 700, inStock: true },
-        { key: "12_full", label: "12 Full Size", variationId: "V_RIC_FULL", qty: 12, priceCents: 700, inStock: true },
-        { key: "12_mini", label: "12 Mini", variationId: "V_RIC_MINI", qty: 12, priceCents: 400, inStock: true },
-        { key: "24_mini", label: "24 Mini", variationId: "V_RIC_MINI", qty: 24, priceCents: 400, inStock: true },
+        { key: "6_full", label: "6 Full Size", variationId: "V_RIC_FULL", qty: 6, priceCents: 700, inStock: true, ...ic("V_IC_FULL", 700) },
+        { key: "12_full", label: "12 Full Size", variationId: "V_RIC_FULL", qty: 12, priceCents: 700, inStock: true, ...ic("V_IC_FULL", 700) },
+        { key: "12_mini", label: "12 Mini", variationId: "V_RIC_MINI", qty: 12, priceCents: 400, inStock: true, ...ic("V_IC_MINI", 400) },
+        { key: "24_mini", label: "24 Mini", variationId: "V_RIC_MINI", qty: 24, priceCents: 400, inStock: true, ...ic("V_IC_MINI", 400) },
       ]);
     });
 
@@ -824,6 +881,183 @@ describe("mergeCannoliItems", () => {
       // does not block the set.
       const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
       expect(result.find((i) => i.id === "cannoli-set__composite")).toBeDefined();
+    });
+
+    describe("cannoliFillings on the set composite (Customize mode)", () => {
+      it("emits both Ricotta and Ice Cream filling branches", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        expect(set.cannoliFillings!.map((f) => f.key)).toEqual([
+          "ice_cream",
+          "ricotta",
+        ]);
+      });
+
+      it("strips Multiple Boxes from both fillings", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ic = set.cannoliFillings!.find((f) => f.key === "ice_cream")!;
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        expect(ic.modifierLists.map((m) => m.name)).not.toContain(
+          "Cannoli Multiple Boxes",
+        );
+        expect(ric.modifierLists.map((m) => m.name)).not.toContain(
+          "Cannoli Multiple Boxes",
+        );
+      });
+
+      it("strips the Cannoli Kit modifier list from both fillings", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ic = set.cannoliFillings!.find((f) => f.key === "ice_cream")!;
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        expect(ic.modifierLists.map((m) => m.name)).not.toContain("Cannoli Kit");
+        expect(ric.modifierLists.map((m) => m.name)).not.toContain("Cannoli Kit");
+      });
+
+      it("strips per-filling Special Notes from both fillings (top-level Set Special Notes covers it)", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ic = set.cannoliFillings!.find((f) => f.key === "ice_cream")!;
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        expect(ic.modifierLists.map((m) => m.modifierType)).not.toContain(
+          "text",
+        );
+        expect(ric.modifierLists.map((m) => m.modifierType)).not.toContain(
+          "text",
+        );
+      });
+
+      it("KEEPS Mixed Garnish on the Set composite's Ricotta Garnish list (no reserved-name strip)", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        const garnish = ric.modifierLists.find((m) => m.id === "ML_GARNISH")!;
+        expect(garnish.modifiers.map((m) => m.name)).toContain("Mixed Garnish");
+      });
+
+      it("Set Ricotta side exposes Shell, Filling, Garnish lists", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        expect(ric.modifierLists.map((m) => m.name)).toEqual([
+          "Cannoli Ricotta Shell",
+          "Cannoli Ricotta Filling",
+          "Cannoli Ricotta Garnish",
+        ]);
+      });
+
+      it("Set Ice Cream side exposes only the Flavor list (no shell, no garnish)", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ic = set.cannoliFillings!.find((f) => f.key === "ice_cream")!;
+        expect(ic.modifierLists.map((m) => m.name)).toEqual([
+          "Cannoli Ice Cream Flavor",
+        ]);
+      });
+
+      it("filling branches carry the underlying Square item id and full variation lists", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ic = set.cannoliFillings!.find((f) => f.key === "ice_cream")!;
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        expect(ic.squareItemId).toBe("I_IC");
+        expect(ric.squareItemId).toBe("I_RIC");
+        expect(ic.variations.map((v) => v.id)).toEqual([
+          "V_IC_FULL",
+          "V_IC_MINI",
+        ]);
+        expect(ric.variations.map((v) => v.id)).toEqual([
+          "V_RIC_FULL",
+          "V_RIC_MINI",
+        ]);
+      });
+    });
+
+    describe("SetOption.iceCream resolution", () => {
+      it("populates iceCream with the matching Ice Cream variation per size", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const sixFull = set.set!.options.find((o) => o.key === "6_full")!;
+        const twentyFourMini = set.set!.options.find((o) => o.key === "24_mini")!;
+        expect(sixFull.iceCream).toEqual({
+          variationId: "V_IC_FULL",
+          priceCents: 700,
+          inStock: true,
+        });
+        expect(twentyFourMini.iceCream).toEqual({
+          variationId: "V_IC_MINI",
+          priceCents: 400,
+          inStock: true,
+        });
+      });
+
+      it("iceCream.inStock mirrors the underlying Ice Cream variation's inStock", () => {
+        const ic = setIceCreamRich();
+        // Mark Ice Cream Mini sold out — affects 12 Mini and 24 Mini iceCream refs.
+        const miniVar = ic.variations.find((v) =>
+          v.name.toLowerCase().startsWith("mini"),
+        )!;
+        miniVar.inStock = false;
+        const result = mergeCannoliItems([ic, setRicotta()], options);
+        const set = result[2];
+        const fullOpt = set.set!.options.find((o) => o.key === "6_full")!;
+        const miniOpt = set.set!.options.find((o) => o.key === "12_mini")!;
+        expect(fullOpt.iceCream!.inStock).toBe(true);
+        expect(miniOpt.iceCream!.inStock).toBe(false);
+      });
+
+      it("omits iceCream when the Ice Cream item lacks a matching variation", () => {
+        const ic = setIceCreamRich();
+        // Drop Ice Cream Mini variation — Mini set options should have no iceCream.
+        ic.variations = ic.variations.filter(
+          (v) => !v.name.toLowerCase().startsWith("mini"),
+        );
+        const result = mergeCannoliItems([ic, setRicotta()], options);
+        const set = result[2];
+        const fullOpt = set.set!.options.find((o) => o.key === "6_full")!;
+        const miniOpt = set.set!.options.find((o) => o.key === "24_mini")!;
+        expect(fullOpt.iceCream).toBeDefined();
+        expect(miniOpt.iceCream).toBeUndefined();
+      });
+
+      it("Set composite still emits even when Ice Cream item has no matching variations at all", () => {
+        // Ricotta supplies the set; missing Ice Cream variations should
+        // degrade Customize → Ice Cream gracefully without blocking the set.
+        const ic = setIceCreamRich();
+        ic.variations = [];
+        const result = mergeCannoliItems([ic, setRicotta()], options);
+        expect(
+          result.find((i) => i.id === "cannoli-set__composite"),
+        ).toBeDefined();
+      });
     });
   });
 
