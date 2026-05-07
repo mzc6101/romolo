@@ -10,13 +10,12 @@ const lineSchema = z.object({
   note: z.string().max(500).optional(),
   // Set when the line came from the Cannoli Kit composite. Server emits an
   // ad-hoc Square line item right after the cannoli line at this price ×
-  // count, and optionally attaches the catalog kit modifier ($0) to the
-  // cannoli line as a POS marker.
+  // count. POS visibility comes from the "Cannoli Kit" line-note prefix
+  // applied client-side, same pattern as the Set composite.
   kitModifier: z
     .object({
       perKitFeeCents: z.number().int().min(0).max(10_000),
       count: z.number().int().min(1).max(20),
-      modifierId: z.string().min(1).optional(),
     })
     .optional(),
 });

@@ -40,12 +40,6 @@ export type SnapshotItem = {
 export type KitInfo = {
   perKitFeeCents: number;
   groupSize: number;
-  // ID of the Cannoli Kit modifier in Square. When present, the order route
-  // attaches it to the cannoli line as a $0 POS marker so the kitchen sees
-  // "Cannoli Kit" tagged on the relevant cannolis. Optional — if the user
-  // deletes the modifier in Square, kit ordering still works (the fee is on
-  // the sibling ad-hoc line, not this modifier).
-  modifierId?: string;
 };
 
 // One pickable size on the Cannoli Set composite. variationId + qty pair
@@ -161,13 +155,12 @@ export type OrderRequest = {
     // emits an ad-hoc Square line item (name="Cannoli Kit", basePriceMoney=
     // perKitFeeCents, quantity=count) right after the cannoli line. Discount
     // rules target the cannoli product set so they ignore the ad-hoc line.
-    // When `modifierId` is set, the catalog modifier is also attached to the
-    // cannoli line at $0 — purely a POS marker so the kitchen can see which
-    // cannolis are kit cannolis.
+    // POS visibility on the cannoli line itself is handled by the
+    // "Cannoli Kit" line-note prefix (see buildLinePayload), same pattern
+    // as the Set composite — no catalog modifier marker is attached.
     kitModifier?: {
       perKitFeeCents: number;
       count: number;
-      modifierId?: string;
     };
   }>;
 };

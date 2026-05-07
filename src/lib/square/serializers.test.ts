@@ -520,7 +520,6 @@ describe("mergeCannoliItems", () => {
     expect(kit.kit).toEqual({
       perKitFeeCents: 200,
       groupSize: 6,
-      modifierId: "ML_KIT_IC_M",
     });
     const [kitIc, kitRic] = kit.cannoliFillings!;
     expect(kitIc.variations.map((v) => v.id)).toEqual(["V_IC_FULL"]);
@@ -1063,9 +1062,9 @@ describe("mergeCannoliItems", () => {
 
   it("emits the kit composite even when the kit modifier list is absent in Square", () => {
     // The kit fee is applied at order submit (ad-hoc line item) rather than
-    // via a catalog modifier, so the kit composite shouldn't depend on the
-    // existence of any modifier list. Once the user deletes the now-vestigial
-    // Cannoli Kit modifier on Square, the frontend keeps working unchanged.
+    // via a catalog modifier, so the kit composite never depends on the
+    // existence of any catalog modifier list. POS visibility on the cannoli
+    // line itself is handled by a fixed line-note prefix client-side.
     const items: SnapshotItem[] = [
       mkItem({
         id: "I_IC",
@@ -1086,6 +1085,5 @@ describe("mergeCannoliItems", () => {
       "cannoli-kit__composite",
     ]);
     expect(result[1].kit).toEqual({ perKitFeeCents: 200, groupSize: 6 });
-    expect(result[1].kit?.modifierId).toBeUndefined();
   });
 });

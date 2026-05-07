@@ -103,6 +103,13 @@ function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
       const opt = findSetOption(item, line);
       if (opt) noteParts.push(`Set: ${opt.label}`);
     }
+    if (item.kit) {
+      // Mirrors the Set composite: a fixed prefix on the cannoli line so the
+      // kitchen ticket reads "Cannoli Kit | <other notes>" at a glance. The
+      // sibling ad-hoc fee line (qty × $2) is the source of truth for kit
+      // count.
+      noteParts.push("Cannoli Kit");
+    }
     for (const ml of activeModifierLists(item, line.fillingKey, line.setMode)) {
       if (ml.modifierType !== "text") continue;
       const text = (line.freeText[ml.id] ?? "").trim();
@@ -114,7 +121,6 @@ function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
     ? {
         perKitFeeCents: item.kit.perKitFeeCents,
         count: Math.floor(line.qty / item.kit.groupSize),
-        ...(item.kit.modifierId ? { modifierId: item.kit.modifierId } : {}),
       }
     : undefined;
   return {

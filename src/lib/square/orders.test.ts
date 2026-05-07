@@ -120,39 +120,4 @@ describe("buildOrderPayload", () => {
     ]);
   });
 
-  it("attaches the cosmetic kit modifier to the cannoli line when modifierId is supplied", () => {
-    const payload = buildOrderPayload(
-      {
-        ...baseRequest,
-        lines: [
-          {
-            catalogObjectId: "VAR_RIC_FULL",
-            quantity: 6,
-            modifiers: ["MOD_SHELL_TOFFEE"],
-            kitModifier: {
-              perKitFeeCents: 200,
-              count: 1,
-              modifierId: "MOD_KIT_TAG",
-            },
-          },
-        ],
-      },
-      "LOC_TEST"
-    );
-    expect(payload.order.lineItems).toEqual([
-      {
-        catalogObjectId: "VAR_RIC_FULL",
-        quantity: "6",
-        modifiers: [
-          { catalogObjectId: "MOD_SHELL_TOFFEE" },
-          { catalogObjectId: "MOD_KIT_TAG" },
-        ],
-      },
-      {
-        name: "Cannoli Kit",
-        quantity: "1",
-        basePriceMoney: { amount: BigInt(200), currency: "USD" },
-      },
-    ]);
-  });
 });

@@ -16,7 +16,6 @@ const lineSchema = z.object({
     .object({
       perKitFeeCents: z.number().int().min(0).max(10_000),
       count: z.number().int().min(1).max(20),
-      modifierId: z.string().min(1).optional(),
     })
     .optional(),
 });

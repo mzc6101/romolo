@@ -74,14 +74,7 @@ export function mergeCannoliItems(
     if (compositePossible && (item === iceCream || item === ricotta)) {
       if (!compositeEmitted) {
         result.push(buildRegularComposite(iceCream!, ricotta!, options));
-        result.push(
-          buildKitComposite(
-            iceCream!,
-            ricotta!,
-            options,
-            resolveKitInfo(iceCream!, ricotta!, options),
-          ),
-        );
+        result.push(buildKitComposite(iceCream!, ricotta!, options));
         const setComposite = buildSetComposite(iceCream!, ricotta!, options);
         if (setComposite) result.push(setComposite);
         compositeEmitted = true;
@@ -91,30 +84,6 @@ export function mergeCannoliItems(
     result.push(item);
   }
   return result;
-}
-
-function resolveKitInfo(
-  iceCream: SnapshotItem,
-  ricotta: SnapshotItem,
-  options: {
-    kitModifierListName: string;
-    kitGroupSize: number;
-    perKitFeeCents: number;
-  }
-): { perKitFeeCents: number; groupSize: number; modifierId?: string } {
-  // The Cannoli Kit modifier is decorative — fee is applied via an ad-hoc
-  // line at submit. We look up its ID anyway so the order route can attach
-  // it to the cannoli line as a $0 POS marker. Tolerate it being absent
-  // (user may delete it on Square at any time without breaking kit orders).
-  const list =
-    iceCream.modifierLists.find((ml) => ml.name === options.kitModifierListName) ??
-    ricotta.modifierLists.find((ml) => ml.name === options.kitModifierListName);
-  const modifierId = list?.modifiers[0]?.id;
-  return {
-    perKitFeeCents: options.perKitFeeCents,
-    groupSize: options.kitGroupSize,
-    ...(modifierId ? { modifierId } : {}),
-  };
 }
 
 function buildRegularComposite(
@@ -166,12 +135,9 @@ function buildKitComposite(
     kitModifierListName: string;
     multipleBoxesModifierListName: string;
     setReservedModifierNames: ReadonlySet<string>;
-  },
-  kitInfo: {
+    kitGroupSize: number;
     perKitFeeCents: number;
-    groupSize: number;
-    modifierId?: string;
-  }
+  },
 ): SnapshotItem {
   // Only Full Size cannolis qualify for the kit; Mini is hidden so the user
   // can't pick an ineligible size. Match by lowercased prefix so renames like
@@ -215,7 +181,10 @@ function buildKitComposite(
         modifierLists: strip(ricotta.modifierLists),
       },
     ],
-    kit: kitInfo,
+    kit: {
+      perKitFeeCents: options.perKitFeeCents,
+      groupSize: options.kitGroupSize,
+    },
   };
 }
 
