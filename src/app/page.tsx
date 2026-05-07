@@ -49,25 +49,18 @@ function emptySnapshot(): MenuSnapshot {
     currency: "USD",
     items: [],
     hours: { byWeekday: {}, timezone: "America/Los_Angeles" },
-    discounts: [],
-    pricingRules: [],
-    productSets: [],
   };
 }
 
 async function loadSnapshot(): Promise<MenuSnapshot> {
   try {
-    const [{ items, discounts, pricingRules, productSets }, hours] =
-      await Promise.all([cachedCatalog(), cachedHours()]);
+    const [{ items }, hours] = await Promise.all([cachedCatalog(), cachedHours()]);
     return {
       fetchedAt: new Date().toISOString(),
       locationId: squareLocationId(),
       currency: "USD",
       items,
       hours,
-      discounts,
-      pricingRules,
-      productSets,
     };
   } catch (err) {
     if (process.env.NODE_ENV !== "production") {

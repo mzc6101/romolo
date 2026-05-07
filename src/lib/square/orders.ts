@@ -2,9 +2,15 @@ import "server-only";
 import { squareClient, squareLocationId } from "./client";
 import type { OrderRequest, OrderResult } from "./types";
 
-export function buildOrderPayload(req: OrderRequest, locationId: string) {
+// Adapts a CartLine (one per cart row) into one or two Square line items:
+// the cannoli line and (when kitModifier is present) a sibling ad-hoc
+// "Cannoli Kit" line that carries the per-kit fee. Used by both order
+// creation and totals calculation so the shape stays in lock-step.
+export function buildOrderLineItems(
+  lines: ReadonlyArray<OrderRequest["lines"][number]>,
+): any[] {
   const lineItems: any[] = [];
-  for (const l of req.lines) {
+  for (const l of lines) {
     const item: any = {
       catalogObjectId: l.catalogObjectId,
       quantity: String(l.quantity),
@@ -43,7 +49,10 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
       });
     }
   }
+  return lineItems;
+}
 
+export function buildOrderPayload(req: OrderRequest, locationId: string) {
   return {
     idempotencyKey: req.idempotencyKey,
     order: {
@@ -55,7 +64,7 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
       pricingOptions: {
         autoApplyDiscounts: true,
       },
-      lineItems,
+      lineItems: buildOrderLineItems(req.lines),
       fulfillments: [
         {
           type: "PICKUP" as const,

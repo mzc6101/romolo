@@ -17,7 +17,6 @@ import type {
   SnapshotModifierList,
   SnapshotVariation,
 } from "@/lib/square/types";
-import { computeDiscounts, type DiscountLine } from "@/lib/square/discounts";
 
 type Contact = { name: string; phone: string; email: string };
 
@@ -89,6 +88,42 @@ function findSetOption(
         o.iceCream?.variationId === line.variationId) &&
       o.qty === line.qty
   );
+}
+
+// Builds the per-line payload sent to /api/orders and /api/orders/calculate.
+// Reused by both place-order submission (StepPay) and totals fetching
+// (OrderSummary) so the calculate result and the placed-order total match
+// exactly. Note prefix and kit-fee shape live here so any change applies
+// to both call sites.
+function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
+  const item = snapshot.items.find((i) => i.id === line.itemId);
+  const noteParts: string[] = [];
+  if (item) {
+    if (item.set && line.variationId) {
+      const opt = findSetOption(item, line);
+      if (opt) noteParts.push(`Set: ${opt.label}`);
+    }
+    for (const ml of activeModifierLists(item, line.fillingKey, line.setMode)) {
+      if (ml.modifierType !== "text") continue;
+      const text = (line.freeText[ml.id] ?? "").trim();
+      if (text.length === 0) continue;
+      noteParts.push(`${ml.name}: ${text}`);
+    }
+  }
+  const kitModifier = item?.kit
+    ? {
+        perKitFeeCents: item.kit.perKitFeeCents,
+        count: Math.floor(line.qty / item.kit.groupSize),
+        ...(item.kit.modifierId ? { modifierId: item.kit.modifierId } : {}),
+      }
+    : undefined;
+  return {
+    catalogObjectId: line.variationId,
+    quantity: line.qty,
+    modifiers: Object.values(line.modifiers).flat(),
+    ...(noteParts.length > 0 ? { note: noteParts.join(" | ") } : {}),
+    ...(kitModifier ? { kitModifier } : {}),
+  };
 }
 
 // Composite items (Cannoli) start with no filling selected — the user must
@@ -329,42 +364,7 @@ export default function OrderFlow() {
         sourceId: tokenResult.token,
         pickupAt,
         contact: order.contact,
-        lines: order.lines.map((l) => {
-          const item = snapshot.items.find((i) => i.id === l.itemId);
-          const noteParts: string[] = [];
-          if (item) {
-            // Set lines lead the note with "Set: <size>" so the kitchen
-            // ticket shows the packaging at a glance. Free-text Special
-            // Notes (if any) follow.
-            if (item.set && l.variationId) {
-              const opt = findSetOption(item, l);
-              if (opt) noteParts.push(`Set: ${opt.label}`);
-            }
-            for (const ml of activeModifierLists(item, l.fillingKey, l.setMode)) {
-              if (ml.modifierType !== "text") continue;
-              const text = (l.freeText[ml.id] ?? "").trim();
-              if (text.length === 0) continue;
-              noteParts.push(`${ml.name}: ${text}`);
-            }
-          }
-          const kitModifier =
-            item?.kit
-              ? {
-                  perKitFeeCents: item.kit.perKitFeeCents,
-                  count: Math.floor(l.qty / item.kit.groupSize),
-                  ...(item.kit.modifierId
-                    ? { modifierId: item.kit.modifierId }
-                    : {}),
-                }
-              : undefined;
-          return {
-            catalogObjectId: l.variationId,
-            quantity: l.qty,
-            modifiers: Object.values(l.modifiers).flat(),
-            ...(noteParts.length > 0 ? { note: noteParts.join(" | ") } : {}),
-            ...(kitModifier ? { kitModifier } : {}),
-          };
-        }),
+        lines: order.lines.map((l) => buildLinePayload(l, snapshot)),
       }),
     });
 
@@ -1302,75 +1302,88 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
   );
 }
 
+type CalculatedTotals = {
+  subtotalCents: number;
+  kitFeeCents: number;
+  discountCents: number;
+  totalCents: number;
+  applied: Array<{ name: string; amountCents: number }>;
+};
+
 function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapshot }) {
-  const discountLines: DiscountLine[] = [];
-  // Kit fees sit outside discount math: the cannoli quantity tier is about
-  // cannolis-per-order, and the kit charge is packaging that gets added on
-  // top regardless of any discount that fires on the cannolis themselves.
-  let kitFeeCents = 0;
-  let kitCount = 0;
-  for (const l of order.lines) {
-    const item = snapshot.items.find((i) => i.id === l.itemId);
-    if (!item) continue;
-    let unitCents: number;
-    if (item.set) {
-      // Set lines source price from the matching SetOption (captured at
-      // catalog-build time). activeVariations returns [] for set items, so
-      // the standard variation lookup below would skip the line.
-      const opt = findSetOption(item, l);
-      if (!opt) continue;
-      unitCents =
-        l.setMode === "customize" && l.fillingKey === "ice_cream" && opt.iceCream
-          ? opt.iceCream.priceCents
-          : opt.priceCents;
-      // Default-mode auto modifiers are all $0; Customize lines may carry
-      // user-selected modifiers with priced upcharges (e.g. Pistachio).
-      if (l.setMode === "customize") {
-        for (const ml of activeModifierLists(item, l.fillingKey, l.setMode)) {
-          const selected = l.modifiers[ml.id] ?? [];
-          for (const modId of selected) {
-            const mod = ml.modifiers.find((m) => m.id === modId);
-            if (mod) unitCents += mod.priceCents;
-          }
-        }
-      }
-    } else {
-      const variations = activeVariations(item, l.fillingKey);
-      const modifierLists = activeModifierLists(item, l.fillingKey, l.setMode);
-      const variation = variations.find((v) => v.id === l.variationId);
-      if (!variation) continue;
-      unitCents = variation.priceCents;
-      for (const ml of modifierLists) {
-        const selected = l.modifiers[ml.id] ?? [];
-        for (const modId of selected) {
-          const mod = ml.modifiers.find((m) => m.id === modId);
-          if (mod) unitCents += mod.priceCents;
-        }
-      }
-    }
-    discountLines.push({
-      lineKey: l.id,
-      catalogObjectId: l.variationId,
-      quantity: l.qty,
-      subtotalCents: unitCents * l.qty,
-    });
-    if (item.kit) {
-      const count = Math.floor(l.qty / item.kit.groupSize);
-      kitCount += count;
-      kitFeeCents += count * item.kit.perKitFeeCents;
-    }
-  }
+  // Server-side totals: only valid lines participate. Square (via
+  // /api/orders/calculate) is the authoritative source for subtotal,
+  // discounts, and grand total — the frontend never recomputes pricing
+  // logic. Last-known totals are kept across in-flight fetches so the
+  // footer doesn't blink while the user is mid-edit.
+  const [totals, setTotals] = useState<CalculatedTotals | null>(null);
 
-  const { subtotalCents, discountCents, totalCents: cannoliTotalCents, applied } =
-    computeDiscounts(discountLines, snapshot);
-  const totalCents = cannoliTotalCents + kitFeeCents;
+  const payloadKey = useMemo(() => {
+    const valid = order.lines.filter((l) => lineValid(l, snapshot));
+    if (valid.length === 0) return null;
+    return JSON.stringify(valid.map((l) => buildLinePayload(l, snapshot)));
+  }, [order.lines, snapshot]);
+
+  // Aggregate kit count from valid lines for the "Cannoli Kit × N" caption.
+  // Cheap derivation; not worth round-tripping through Square just to label.
+  const kitCount = useMemo(() => {
+    let n = 0;
+    for (const l of order.lines) {
+      const item = snapshot.items.find((i) => i.id === l.itemId);
+      if (!item?.kit) continue;
+      if (!lineValid(l, snapshot)) continue;
+      n += Math.floor(l.qty / item.kit.groupSize);
+    }
+    return n;
+  }, [order.lines, snapshot]);
+
+  useEffect(() => {
+    if (!payloadKey) {
+      setTotals(null);
+      return;
+    }
+    const ac = new AbortController();
+    // 300ms debounce: chip toggles fire several state updates in a row;
+    // wait for the user to settle before round-tripping to Square.
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/orders/calculate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lines: JSON.parse(payloadKey) }),
+          signal: ac.signal,
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          setTotals({
+            subtotalCents: data.subtotalCents,
+            kitFeeCents: data.kitFeeCents,
+            discountCents: data.discountCents,
+            totalCents: data.totalCents,
+            applied: data.applied ?? [],
+          });
+        }
+        // On non-ok responses we silently keep last-known totals; the user
+        // can still hit Continue and the place-order request will surface
+        // any real error inline.
+      } catch (e: any) {
+        if (e?.name !== "AbortError") {
+          // Network failure: keep last-known totals.
+        }
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timeout);
+      ac.abort();
+    };
+  }, [payloadKey]);
+
+  const subtotalCents = totals?.subtotalCents ?? 0;
+  const kitFeeCents = totals?.kitFeeCents ?? 0;
+  const discountCents = totals?.discountCents ?? 0;
+  const totalCents = totals?.totalCents ?? 0;
+  const applied = totals?.applied ?? [];
   const showBreakdown = discountCents > 0 || kitFeeCents > 0;
-
-  // Aggregate applied discounts by name for compact display
-  const discountByName = new Map<string, number>();
-  for (const a of applied) {
-    discountByName.set(a.name, (discountByName.get(a.name) ?? 0) + a.amountCents);
-  }
 
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
@@ -1380,14 +1393,14 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
             <span>Subtotal</span>
             <span className="tabular-nums">{fmtCents(subtotalCents)}</span>
           </div>
-          {[...discountByName.entries()].map(([name, amount]) => (
+          {applied.map(({ name, amountCents }) => (
             <div
               key={name}
               className="flex items-baseline justify-between gap-3 text-[11px] text-romolo-red"
               title={name}
             >
               <span className="truncate max-w-[180px]">{name}</span>
-              <span className="tabular-nums">−{fmtCents(amount)}</span>
+              <span className="tabular-nums">−{fmtCents(amountCents)}</span>
             </div>
           ))}
           {kitFeeCents > 0 && (

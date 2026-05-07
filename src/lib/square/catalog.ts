@@ -2,19 +2,10 @@ import "server-only";
 import { squareClient, squareLocationId } from "./client";
 import {
   mergeCannoliItems,
-  serializeDiscount,
   serializeItem,
   serializeModifierList,
-  serializePricingRule,
-  serializeProductSet,
 } from "./serializers";
-import type {
-  SnapshotDiscount,
-  SnapshotItem,
-  SnapshotModifierList,
-  SnapshotPricingRule,
-  SnapshotProductSet,
-} from "./types";
+import type { SnapshotItem, SnapshotModifierList } from "./types";
 
 // Walks the raw Square objects and applies per-location sold-out flags onto
 // the serialized snapshot. We post-process here (rather than threading the
@@ -134,23 +125,15 @@ const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
 ]);
 const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
-export async function getCatalog(): Promise<{
-  items: SnapshotItem[];
-  discounts: SnapshotDiscount[];
-  pricingRules: SnapshotPricingRule[];
-  productSets: SnapshotProductSet[];
-}> {
+export async function getCatalog(): Promise<{ items: SnapshotItem[] }> {
   const client = squareClient();
   const locationId = squareLocationId();
 
+  // Discount / pricing-rule / product-set objects aren't fetched anymore —
+  // their evaluation lives in Square's calculate endpoint, which doesn't
+  // need the catalog snapshot to know about them.
   const search = await client.catalog.search({
-    objectTypes: [
-      "ITEM",
-      "CATEGORY",
-      "DISCOUNT",
-      "PRICING_RULE",
-      "PRODUCT_SET",
-    ],
+    objectTypes: ["ITEM", "CATEGORY"],
     includeRelatedObjects: true,
   });
 
@@ -234,15 +217,5 @@ export async function getCatalog(): Promise<{
     specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });
 
-  const discounts = allObjects
-    .filter((o) => o.type === "DISCOUNT")
-    .map(serializeDiscount);
-  const pricingRules = allObjects
-    .filter((o) => o.type === "PRICING_RULE")
-    .map(serializePricingRule);
-  const productSets = allObjects
-    .filter((o) => o.type === "PRODUCT_SET")
-    .map(serializeProductSet);
-
-  return { items: mergedItems, discounts, pricingRules, productSets };
+  return { items: mergedItems };
 }
