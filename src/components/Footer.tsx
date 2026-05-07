@@ -3,38 +3,6 @@
 export default function Footer() {
   return (
     <footer className="bg-romolo-charcoal text-white">
-      {/* Newsletter band */}
-      <div className="border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div>
-              <h3 className="font-[var(--font-serif)] text-2xl md:text-3xl font-light mb-1">
-                Stay in the <span className="italic">Loop</span> POSSIBLY REMOVE
-              </h3>
-              <p className="text-sm text-white/50">
-                New flavors, seasonal specials, and the occasional love letter.
-              </p>
-            </div>
-            <form
-              className="flex w-full md:w-auto"
-              onSubmit={(e) => e.preventDefault()}
-            >
-              <input
-                type="email"
-                placeholder="your@email.com"
-                className="flex-1 md:w-64 px-4 py-3 bg-white/5 border border-white/15 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-romolo-red/60 transition-colors"
-              />
-              <button
-                type="submit"
-                className="px-6 py-3 bg-romolo-red text-white text-[11px] font-bold tracking-[0.15em] uppercase hover:bg-romolo-red-dark transition-colors shrink-0"
-              >
-                Subscribe
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
       {/* Main footer */}
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-14">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
