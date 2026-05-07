@@ -1,4 +1,7 @@
 import type {
+  AutoModifierRef,
+  SetInfo,
+  SetOption,
   SnapshotDiscount,
   SnapshotItem,
   SnapshotModifierList,
@@ -58,8 +61,8 @@ export function serializePricingRule(raw: any): SnapshotPricingRule {
 // filling type as separate items because modifier lists can't be scoped to
 // specific variations — so the merge happens here on the frontend instead.
 //
-// Two composites are emitted (in order, at the position of the first
-// underlying filling):
+// Up to three composites are emitted (in order, at the position of the
+// first underlying filling):
 //   1. "Cannoli" — full menu (both sizes, all modifier lists except the kit
 //      modifier list, which is reserved for the kit composite).
 //   2. "Cannoli Kit" — Full Size only, modifier lists minus Multiple Boxes
@@ -67,6 +70,15 @@ export function serializePricingRule(raw: any): SnapshotPricingRule {
 //      submit, so the user shouldn't see the toggle). Tagged with KitInfo so
 //      the frontend can drive qty stepping by groupSize and submit the
 //      override.
+//   3. "Cannoli Set" — fixed-recipe Ricotta build (Ricotta + Chocolate +
+//      Mixed) sold in three sizes (6 Full / 12 Full / 24 Mini). Tagged with
+//      SetInfo carrying the size options and auto-applied modifier ids.
+//      Emitted only when all auto modifiers, both variations, and the
+//      Special Notes list resolve on the Ricotta item.
+//
+// Reserved modifier options (e.g. the Mixed garnish) are stripped from the
+// regular and kit composites so they only surface as the auto-applied set
+// recipe, never as a user-selectable choice on other composites.
 //
 // If only one filling exists, no composite is produced — that filling passes
 // through untouched. Items not matching either name pass through untouched.
@@ -83,6 +95,20 @@ export function mergeCannoliItems(
     multipleBoxesModifierListName: string;
     kitGroupSize: number;
     perKitFeeCents: number;
+    setCompositeName: string;
+    setCompositeId: string;
+    setAutoModifiers: ReadonlyArray<{
+      listNameSuffix: string;
+      modifierName: string;
+    }>;
+    setOptionSpecs: ReadonlyArray<{
+      key: string;
+      label: string;
+      variationPrefix: string;
+      qty: number;
+    }>;
+    setReservedModifierNames: ReadonlySet<string>;
+    specialNotesListNameSuffix: string;
   }
 ): SnapshotItem[] {
   const iceCream = items.find((i) => i.name === options.iceCreamItemName);
@@ -103,6 +129,8 @@ export function mergeCannoliItems(
             resolveKitInfo(iceCream!, ricotta!, options),
           ),
         );
+        const setComposite = buildSetComposite(ricotta!, options);
+        if (setComposite) result.push(setComposite);
         compositeEmitted = true;
       }
       continue;
@@ -143,10 +171,13 @@ function buildRegularComposite(
     compositeId: string;
     compositeName: string;
     kitModifierListName: string;
+    setReservedModifierNames: ReadonlySet<string>;
   }
 ): SnapshotItem {
   const stripKit = (lists: SnapshotModifierList[]) =>
     lists.filter((ml) => ml.name !== options.kitModifierListName);
+  const strip = (lists: SnapshotModifierList[]) =>
+    stripReservedModifierOptions(stripKit(lists), options.setReservedModifierNames);
   return {
     id: options.compositeId,
     name: options.compositeName,
@@ -160,14 +191,14 @@ function buildRegularComposite(
         label: "Ice Cream",
         squareItemId: iceCream.id,
         variations: iceCream.variations,
-        modifierLists: stripKit(iceCream.modifierLists),
+        modifierLists: strip(iceCream.modifierLists),
       },
       {
         key: "ricotta",
         label: "Ricotta",
         squareItemId: ricotta.id,
         variations: ricotta.variations,
-        modifierLists: stripKit(ricotta.modifierLists),
+        modifierLists: strip(ricotta.modifierLists),
       },
     ],
   };
@@ -181,6 +212,7 @@ function buildKitComposite(
     kitCompositeName: string;
     kitModifierListName: string;
     multipleBoxesModifierListName: string;
+    setReservedModifierNames: ReadonlySet<string>;
   },
   kitInfo: {
     perKitFeeCents: number;
@@ -202,6 +234,11 @@ function buildKitComposite(
         ml.name !== options.kitModifierListName &&
         ml.name !== options.multipleBoxesModifierListName
     );
+  const strip = (lists: SnapshotModifierList[]) =>
+    stripReservedModifierOptions(
+      stripKitAndBoxes(lists),
+      options.setReservedModifierNames,
+    );
   return {
     id: options.kitCompositeId,
     name: options.kitCompositeName,
@@ -215,17 +252,129 @@ function buildKitComposite(
         label: "Ice Cream",
         squareItemId: iceCream.id,
         variations: fullSizeOnly(iceCream.variations),
-        modifierLists: stripKitAndBoxes(iceCream.modifierLists),
+        modifierLists: strip(iceCream.modifierLists),
       },
       {
         key: "ricotta",
         label: "Ricotta",
         squareItemId: ricotta.id,
         variations: fullSizeOnly(ricotta.variations),
-        modifierLists: stripKitAndBoxes(ricotta.modifierLists),
+        modifierLists: strip(ricotta.modifierLists),
       },
     ],
     kit: kitInfo,
+  };
+}
+
+// Filters reserved modifier OPTIONS (not lists) out of every list. Used so
+// set-only options like "Mixed" garnish never surface on the regular or kit
+// composites, even though the underlying Garnish list itself stays visible
+// for picking other garnishes (Sprinkles, Chocolate Chips, etc.).
+function stripReservedModifierOptions(
+  lists: SnapshotModifierList[],
+  reserved: ReadonlySet<string>,
+): SnapshotModifierList[] {
+  if (reserved.size === 0) return lists;
+  return lists.map((ml) =>
+    ml.modifierType === "list"
+      ? { ...ml, modifiers: ml.modifiers.filter((m) => !reserved.has(m.name)) }
+      : ml,
+  );
+}
+
+// Resolves the Cannoli Set composite from the Ricotta item. Returns null
+// (no error) when any of the three auto modifiers, the Special Notes list,
+// or one of the size variations can't be resolved — the rest of the menu
+// keeps working and the operator gets a console warning.
+function buildSetComposite(
+  ricotta: SnapshotItem,
+  options: {
+    setCompositeId: string;
+    setCompositeName: string;
+    setAutoModifiers: ReadonlyArray<{
+      listNameSuffix: string;
+      modifierName: string;
+    }>;
+    setOptionSpecs: ReadonlyArray<{
+      key: string;
+      label: string;
+      variationPrefix: string;
+      qty: number;
+    }>;
+    specialNotesListNameSuffix: string;
+  },
+): SnapshotItem | null {
+  const autoModifiers: AutoModifierRef[] = [];
+  for (const spec of options.setAutoModifiers) {
+    const list = ricotta.modifierLists.find(
+      (ml) =>
+        ml.modifierType === "list" &&
+        ml.name.toLowerCase().trim().endsWith(spec.listNameSuffix),
+    );
+    if (!list) {
+      console.warn(
+        `[cannoli-set] Modifier list with suffix "${spec.listNameSuffix}" not found on Ricotta — skipping set composite.`,
+      );
+      return null;
+    }
+    const modifier = list.modifiers.find(
+      (m) => m.name.toLowerCase().trim() === spec.modifierName.toLowerCase().trim(),
+    );
+    if (!modifier) {
+      console.warn(
+        `[cannoli-set] Modifier "${spec.modifierName}" not found in "${list.name}" — skipping set composite.`,
+      );
+      return null;
+    }
+    autoModifiers.push({
+      modifierListId: list.id,
+      modifierId: modifier.id,
+      ...(modifier.soldOut ? { soldOut: true } : {}),
+    });
+  }
+
+  const setOptions: SetOption[] = [];
+  for (const spec of options.setOptionSpecs) {
+    const variation = ricotta.variations.find((v) =>
+      v.name.toLowerCase().trim().startsWith(spec.variationPrefix),
+    );
+    if (!variation) {
+      console.warn(
+        `[cannoli-set] Variation with prefix "${spec.variationPrefix}" not found on Ricotta — skipping set composite.`,
+      );
+      return null;
+    }
+    setOptions.push({
+      key: spec.key,
+      label: spec.label,
+      variationId: variation.id,
+      qty: spec.qty,
+      inStock: variation.inStock,
+    });
+  }
+
+  const specialNotesList = ricotta.modifierLists.find(
+    (ml) =>
+      ml.modifierType === "text" &&
+      ml.name.toLowerCase().trim().endsWith(options.specialNotesListNameSuffix),
+  );
+  if (!specialNotesList) {
+    console.warn(
+      `[cannoli-set] Special Notes list with suffix "${options.specialNotesListNameSuffix}" not found on Ricotta — skipping set composite.`,
+    );
+    return null;
+  }
+
+  const set: SetInfo = { options: setOptions, autoModifiers };
+
+  return {
+    id: options.setCompositeId,
+    name: options.setCompositeName,
+    description: undefined,
+    categoryName: ricotta.categoryName,
+    variations: [],
+    modifierLists: [specialNotesList],
+    set,
   };
 }
 

@@ -105,6 +105,34 @@ const MULTIPLE_BOXES_MODIFIER_LIST_NAME = "Cannoli Multiple Boxes";
 const KIT_GROUP_SIZE = 6;
 const PER_KIT_FEE_CENTS = 200;
 
+// Cannoli Set composite — fixed-recipe Ricotta build (Ricotta + Chocolate +
+// Mixed) sold in three sizes. Auto modifiers are looked up by name from the
+// Ricotta item's modifier lists at catalog-build time. Suffix matching on
+// list names survives Square renames the same way modifierListRank does.
+const SET_COMPOSITE_NAME = "Cannoli Set";
+const SET_COMPOSITE_ID = "cannoli-set__composite";
+// Auto-applied modifier OPTIONS, looked up by name from the Ricotta item's
+// modifier lists. The Filling list ("Cannoli Ricotta Filling") picks the
+// ricotta *flavor* — set lines default to "Original" plain ricotta. Shell
+// and Garnish are also fixed.
+const SET_AUTO_MODIFIERS = [
+  { listNameSuffix: "filling", modifierName: "Original" },
+  { listNameSuffix: "shell", modifierName: "Chocolate" },
+  { listNameSuffix: "garnish", modifierName: "Mixed Garnish" },
+] as const;
+const SET_OPTION_SPECS = [
+  { key: "6_full", label: "6 Full Size", variationPrefix: "full", qty: 6 },
+  { key: "12_full", label: "12 Full Size", variationPrefix: "full", qty: 12 },
+  { key: "24_mini", label: "24 Mini", variationPrefix: "mini", qty: 24 },
+] as const;
+// Modifier OPTION names that exist in Square but should NOT surface as user-
+// pickable choices on the regular Cannoli or Cannoli Kit composites — they
+// are reserved for set-only auto-application.
+const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
+  "Mixed Garnish",
+]);
+const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
+
 export async function getCatalog(): Promise<{
   items: SnapshotItem[];
   discounts: SnapshotDiscount[];
@@ -197,6 +225,12 @@ export async function getCatalog(): Promise<{
     multipleBoxesModifierListName: MULTIPLE_BOXES_MODIFIER_LIST_NAME,
     kitGroupSize: KIT_GROUP_SIZE,
     perKitFeeCents: PER_KIT_FEE_CENTS,
+    setCompositeName: SET_COMPOSITE_NAME,
+    setCompositeId: SET_COMPOSITE_ID,
+    setAutoModifiers: SET_AUTO_MODIFIERS,
+    setOptionSpecs: SET_OPTION_SPECS,
+    setReservedModifierNames: SET_RESERVED_MODIFIER_NAMES,
+    specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });
 
   const discounts = allObjects

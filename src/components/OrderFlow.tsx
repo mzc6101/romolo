@@ -92,8 +92,13 @@ const lineId = () => Math.random().toString(36).slice(2, 8);
 
 // Seed defaults for a fresh OrderLine: leaves required SINGLE-list selections
 // empty (user must pick) so the "required" enforcement works, but pre-fills
-// nothing for optional / TEXT / MULTIPLE lists.
-function seedSelectionsForLists(modifierLists: SnapshotModifierList[]) {
+// nothing for optional / TEXT / MULTIPLE lists. For set items the caller
+// also passes the auto-applied modifier refs so they ride along on the
+// line and flush to Square at submit even though no UI surfaces them.
+function seedSelectionsForLists(
+  modifierLists: SnapshotModifierList[],
+  autoModifiers: ReadonlyArray<{ modifierListId: string; modifierId: string }> = [],
+) {
   const modifiers: Record<string, string[]> = {};
   const freeText: Record<string, string> = {};
   for (const ml of modifierLists) {
@@ -103,7 +108,46 @@ function seedSelectionsForLists(modifierLists: SnapshotModifierList[]) {
       modifiers[ml.id] = [];
     }
   }
+  for (const am of autoModifiers) {
+    modifiers[am.modifierListId] = [am.modifierId];
+  }
   return { modifiers, freeText };
+}
+
+// Computes the initial OrderLine state for a freshly added or item-swapped
+// line. Three composite types: filling-picker (Cannoli), kit (qty enforced
+// to groupSize), set (size chips drive variation+qty after selection).
+// Non-composite items preselect the first in-stock variation.
+function buildLineSeedForItem(item: SnapshotItem) {
+  if (item.set) {
+    // Set: variation + qty are picked via size chip; modifiers list contains
+    // only Special Notes (TEXT). Auto modifiers (Filling/Shell/Garnish) ride
+    // along in line.modifiers so they flush to Square at submit unchanged.
+    const { modifiers, freeText } = seedSelectionsForLists(
+      item.modifierLists,
+      item.set.autoModifiers,
+    );
+    return { variationId: "", qty: 0, modifiers, freeText };
+  }
+  if (item.cannoliFillings) {
+    // Composite: filling stays unselected until user picks it; variation and
+    // modifier lists become available once a filling is chosen.
+    return {
+      variationId: "",
+      qty: item.kit ? item.kit.groupSize : 1,
+      modifiers: {},
+      freeText: {},
+    };
+  }
+  const firstVariation =
+    item.variations.find((v) => v.inStock) ?? item.variations[0];
+  const { modifiers, freeText } = seedSelectionsForLists(item.modifierLists);
+  return {
+    variationId: firstVariation?.id ?? "",
+    qty: item.kit ? item.kit.groupSize : 1,
+    modifiers,
+    freeText,
+  };
 }
 
 const initialOrder = (): Order => ({
@@ -130,10 +174,27 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
     if (line.qty < item.kit.groupSize) return false;
     if (line.qty % item.kit.groupSize !== 0) return false;
   }
+  if (item.set) {
+    // Set lines must match exactly one of the predefined size options
+    // (variationId + qty pair) and the Ricotta variation must be in stock.
+    // Auto-applied modifiers are checked via their soldOut bit captured at
+    // catalog-build time so the UI can disable a chip as soon as the
+    // dashboard flips a flag.
+    if (!line.variationId) return false;
+    const opt = item.set.options.find(
+      (o) => o.variationId === line.variationId && o.qty === line.qty,
+    );
+    if (!opt || !opt.inStock) return false;
+    if (item.set.autoModifiers.some((am) => am.soldOut)) return false;
+  }
   const variations = activeVariations(item, line.fillingKey);
   const modifierLists = activeModifierLists(item, line.fillingKey);
-  const variation = variations.find((v) => v.id === line.variationId);
-  if (!variation || !variation.inStock) return false;
+  // Set lines satisfy the variation in-stock check above; activeVariations
+  // returns [] for set items, so skip the standard variation lookup.
+  if (!item.set) {
+    const variation = variations.find((v) => v.id === line.variationId);
+    if (!variation || !variation.inStock) return false;
+  }
   for (const ml of modifierLists) {
     if (ml.modifierType === "text") {
       const text = (line.freeText[ml.id] ?? "").trim();
@@ -211,6 +272,15 @@ export default function OrderFlow() {
           const item = snapshot.items.find((i) => i.id === l.itemId);
           const noteParts: string[] = [];
           if (item) {
+            // Set lines lead the note with "Set: <size>" so the kitchen
+            // ticket shows the packaging at a glance. Free-text Special
+            // Notes (if any) follow.
+            if (item.set && l.variationId) {
+              const opt = item.set.options.find(
+                (o) => o.variationId === l.variationId && o.qty === l.qty,
+              );
+              if (opt) noteParts.push(`Set: ${opt.label}`);
+            }
             for (const ml of activeModifierLists(item, l.fillingKey)) {
               if (ml.modifierType !== "text") continue;
               const text = (l.freeText[ml.id] ?? "").trim();
@@ -597,16 +667,7 @@ function StepWhat({
   const addLine = () => {
     const firstItem = snapshot.items[0];
     if (!firstItem) return;
-    const isComposite = !!firstItem.cannoliFillings;
-    // Composite: filling/size both stay unselected until the user picks them.
-    // Non-composite: keep historical behavior — preselect first in-stock variation.
-    const variations = isComposite ? [] : firstItem.variations;
-    const modifierLists = isComposite ? [] : firstItem.modifierLists;
-    const firstVariation = isComposite
-      ? undefined
-      : variations.find((v) => v.inStock) ?? variations[0];
-    const { modifiers: seedModifiers, freeText: seedFreeText } =
-      seedSelectionsForLists(modifierLists);
+    const seed = buildLineSeedForItem(firstItem);
     setOrder({
       ...order,
       lines: [
@@ -615,10 +676,10 @@ function StepWhat({
           id: lineId(),
           itemId: firstItem.id,
           fillingKey: undefined,
-          variationId: firstVariation?.id ?? "",
-          qty: firstItem.kit ? firstItem.kit.groupSize : 1,
-          modifiers: seedModifiers,
-          freeText: seedFreeText,
+          variationId: seed.variationId,
+          qty: seed.qty,
+          modifiers: seed.modifiers,
+          freeText: seed.freeText,
         },
       ],
     });
@@ -679,21 +740,14 @@ function OrderLineEditor({
   const onItemChange = (id: string) => {
     const next = snapshot.items.find((i) => i.id === id);
     if (!next) return;
-    const isComposite = !!next.cannoliFillings;
-    const nextVariations = isComposite ? [] : next.variations;
-    const nextLists = isComposite ? [] : next.modifierLists;
-    const firstVariation = isComposite
-      ? undefined
-      : nextVariations.find((v) => v.inStock) ?? nextVariations[0];
-    const { modifiers: seedModifiers, freeText: seedFreeText } =
-      seedSelectionsForLists(nextLists);
+    const seed = buildLineSeedForItem(next);
     onChange({
       itemId: id,
       fillingKey: undefined,
-      variationId: firstVariation?.id ?? "",
-      qty: next.kit ? next.kit.groupSize : 1,
-      modifiers: seedModifiers,
-      freeText: seedFreeText,
+      variationId: seed.variationId,
+      qty: seed.qty,
+      modifiers: seed.modifiers,
+      freeText: seed.freeText,
     });
   };
 
@@ -717,6 +771,13 @@ function OrderLineEditor({
     });
   };
 
+  const onSetOptionChange = (key: string) => {
+    if (!item.set) return;
+    const opt = item.set.options.find((o) => o.key === key);
+    if (!opt) return;
+    onChange({ variationId: opt.variationId, qty: opt.qty });
+  };
+
   return (
     <div className="border border-romolo-border rounded-sm p-4 bg-white">
       <div className="flex items-start justify-between gap-3 mb-3.5">
@@ -738,12 +799,17 @@ function OrderLineEditor({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <QtyStepper
-            qty={line.qty}
-            step={item.kit ? item.kit.groupSize : 1}
-            min={item.kit ? item.kit.groupSize : 1}
-            onChange={(v) => onChange({ qty: v })}
-          />
+          {/* Set lines have a fixed qty per size option (6/12/24); the size
+              chip picker below carries the qty selection, so the stepper
+              would be misleading. */}
+          {!item.set && (
+            <QtyStepper
+              qty={line.qty}
+              step={item.kit ? item.kit.groupSize : 1}
+              min={item.kit ? item.kit.groupSize : 1}
+              onChange={(v) => onChange({ qty: v })}
+            />
+          )}
           {onRemove && (
             <button
               onClick={onRemove}
@@ -780,6 +846,38 @@ function OrderLineEditor({
                   }`}
                 >
                   {f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {item.set && (
+        <div className="mb-4">
+          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+            Set Size
+          </h5>
+          <div className="flex flex-wrap gap-2">
+            {item.set.options.map((o) => {
+              const sel =
+                o.variationId === line.variationId && o.qty === line.qty;
+              const disabled = !o.inStock;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onSetOptionChange(o.key)}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    disabled
+                      ? "bg-romolo-cream/60 text-romolo-warm-gray/50 border-romolo-border line-through cursor-not-allowed"
+                      : sel
+                        ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                        : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
+                  }`}
+                >
+                  {o.label}
                 </button>
               );
             })}

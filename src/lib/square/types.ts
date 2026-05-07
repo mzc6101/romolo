@@ -60,6 +60,13 @@ export type SnapshotItem = {
   // the Square order (Square modifier prices always scale with line qty, so
   // a modifier-based fee can't express "$2 per 6 cannolis").
   kit?: KitInfo;
+  // Set on the synthetic "Cannoli Set" composite. Fixed-recipe Ricotta build
+  // (Ricotta filling + Chocolate shell + Mixed garnish) sold in three sizes
+  // (6 Full / 12 Full / 24 Mini). The user picks a size; recipe and qty are
+  // not editable. Modifiers are auto-applied via line.modifiers at addLine
+  // time and flushed to Square unchanged. Pricing is variation × qty (no
+  // set fee, no ad-hoc line).
+  set?: SetInfo;
 };
 
 export type KitInfo = {
@@ -71,6 +78,34 @@ export type KitInfo = {
   // deletes the modifier in Square, kit ordering still works (the fee is on
   // the sibling ad-hoc line, not this modifier).
   modifierId?: string;
+};
+
+// One pickable size on the Cannoli Set composite. variationId + qty pair
+// resolves uniquely (e.g. 6 Full and 12 Full share variationId but differ
+// in qty), so any (variationId, qty) match identifies the option. inStock
+// is captured at catalog-build time from the underlying Ricotta variation.
+export type SetOption = {
+  key: string;
+  label: string;
+  variationId: string;
+  qty: number;
+  inStock: boolean;
+};
+
+// Modifier auto-applied to every Cannoli Set line (Filling=Ricotta,
+// Shell=Chocolate, Garnish=Mixed). Lookup is by name from the Ricotta
+// item's modifier lists at catalog-build time. soldOut mirrors
+// SnapshotModifier.soldOut so lineValid can reject without a second
+// lookup.
+export type AutoModifierRef = {
+  modifierListId: string;
+  modifierId: string;
+  soldOut?: boolean;
+};
+
+export type SetInfo = {
+  options: SetOption[];
+  autoModifiers: AutoModifierRef[];
 };
 
 // One filling-type branch under the composite "Cannoli" item. `squareItemId`

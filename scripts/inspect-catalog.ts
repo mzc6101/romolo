@@ -22,6 +22,22 @@ const KIT_MODIFIER_LIST_NAME = "Cannoli Kit";
 const MULTIPLE_BOXES_MODIFIER_LIST_NAME = "Cannoli Multiple Boxes";
 const KIT_GROUP_SIZE = 6;
 const PER_KIT_FEE_CENTS = 200;
+const SET_COMPOSITE_NAME = "Cannoli Set";
+const SET_COMPOSITE_ID = "cannoli-set__composite";
+const SET_AUTO_MODIFIERS = [
+  { listNameSuffix: "filling", modifierName: "Original" },
+  { listNameSuffix: "shell", modifierName: "Chocolate" },
+  { listNameSuffix: "garnish", modifierName: "Mixed Garnish" },
+] as const;
+const SET_OPTION_SPECS = [
+  { key: "6_full", label: "6 Full Size", variationPrefix: "full", qty: 6 },
+  { key: "12_full", label: "12 Full Size", variationPrefix: "full", qty: 12 },
+  { key: "24_mini", label: "24 Mini", variationPrefix: "mini", qty: 24 },
+] as const;
+const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
+  "Mixed Garnish",
+]);
+const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
 async function main() {
   const token = process.env.SQUARE_ACCESS_TOKEN!;
@@ -106,6 +122,12 @@ async function main() {
     multipleBoxesModifierListName: MULTIPLE_BOXES_MODIFIER_LIST_NAME,
     kitGroupSize: KIT_GROUP_SIZE,
     perKitFeeCents: PER_KIT_FEE_CENTS,
+    setCompositeName: SET_COMPOSITE_NAME,
+    setCompositeId: SET_COMPOSITE_ID,
+    setAutoModifiers: SET_AUTO_MODIFIERS,
+    setOptionSpecs: SET_OPTION_SPECS,
+    setReservedModifierNames: SET_RESERVED_MODIFIER_NAMES,
+    specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });
 
   console.log(`\n== After merge: ${merged.length} items ==\n`);
@@ -119,10 +141,24 @@ async function main() {
         console.log(
           `      variations: ${f.variations.map((v) => `${v.name} ($${(v.priceCents / 100).toFixed(2)})`).join(", ")}`
         );
-        console.log(
-          `      modifier lists: ${f.modifierLists.map((m) => m.name).join(", ")}`
-        );
+        for (const ml of f.modifierLists) {
+          const opts =
+            ml.modifierType === "list"
+              ? ` [${ml.modifiers.map((m) => m.name).join(", ")}]`
+              : "";
+          console.log(`      mod list: ${ml.name}${opts}`);
+        }
       }
+    } else if (i.set) {
+      console.log(
+        `    set options: ${i.set.options.map((o) => `${o.label} → ${o.variationId} × ${o.qty} (inStock=${o.inStock})`).join(" | ")}`
+      );
+      console.log(
+        `    auto modifiers: ${i.set.autoModifiers.map((am) => `${am.modifierListId}=${am.modifierId}${am.soldOut ? " SOLD OUT" : ""}`).join(", ")}`
+      );
+      console.log(
+        `    modifier lists: ${i.modifierLists.map((m) => m.name).join(", ") || "(none)"}`
+      );
     } else {
       console.log(
         `    variations: ${i.variations.map((v) => `${v.name} ($${(v.priceCents / 100).toFixed(2)})`).join(", ")}`

@@ -30,13 +30,15 @@ Like the other Cannoli composites, the set is synthetic on the frontend and reus
 
 ## Out-of-app prerequisite (Square catalog)
 
-The user has already added a new modifier named **`Mixed`** to the existing **`Cannoli Ricotta Garnish`** modifier list on the Ricotta item. This modifier:
+A new modifier named **`Mixed Garnish`** has been added to the existing **`Cannoli Ricotta Garnish`** modifier list on the Ricotta item. This modifier:
 
-- Lives in the same list as the existing garnish options (Sprinkles, Chocolate Chips, etc.).
+- Lives in the same list as the existing garnish options (Pistachio, Chocolate Chips, Toffee, Cherries).
 - Is the per-line auto-applied garnish for set lines.
 - Must be hidden from the regular Cannoli and Cannoli Kit garnish pickers (visibility filter described below).
 
-If the user later renames the modifier or removes it, the set composite gracefully fails to emit (see Error handling).
+The set composite also auto-applies the `Original` option from `Cannoli Ricotta Filling` (the ricotta-flavor picker) and `Chocolate` from `Cannoli Ricotta Shell`. These are existing options and are NOT reserved — they remain user-pickable on the regular and kit composites.
+
+If any of these options are renamed or removed in Square, the set composite gracefully fails to emit (see Error handling).
 
 ## Architecture
 
@@ -97,9 +99,9 @@ const SET_COMPOSITE_ID   = "cannoli-set__composite";
 // list renames like "Cannoli Ricotta Filling" / "Ricotta Filling" the same
 // way the existing modifierListRank function does.
 const SET_AUTO_MODIFIERS = [
-  { listNameSuffix: "filling", modifierName: "Ricotta"   },
-  { listNameSuffix: "shell",   modifierName: "Chocolate" },
-  { listNameSuffix: "garnish", modifierName: "Mixed"     },
+  { listNameSuffix: "filling", modifierName: "Original"      },
+  { listNameSuffix: "shell",   modifierName: "Chocolate"     },
+  { listNameSuffix: "garnish", modifierName: "Mixed Garnish" },
 ] as const;
 
 // Variation-name prefix (lowercased) → set option spec.
@@ -112,7 +114,7 @@ const SET_OPTION_SPECS = [
 // Modifier OPTION names that exist in Square but should NOT surface as user-
 // pickable choices on the regular Cannoli or Cannoli Kit composites — they
 // are reserved for set-only auto-application.
-const SET_RESERVED_MODIFIER_NAMES = new Set<string>(["Mixed"]);
+const SET_RESERVED_MODIFIER_NAMES = new Set<string>(["Mixed Garnish"]);
 ```
 
 `getCatalog` passes the new constants into `mergeCannoliItems` (signature gains `setCompositeName`, `setCompositeId`, `setAutoModifiers`, `setOptionSpecs`, `setReservedModifierNames`, `specialNotesListNameSuffix`).
