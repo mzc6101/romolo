@@ -717,13 +717,13 @@ describe("mergeCannoliItems", () => {
       expect(set.modifierLists[0].modifierType).toBe("text");
     });
 
-    it("set options resolve to the Full / Mini Ricotta variations with correct qtys", () => {
+    it("set options resolve to the Full / Mini Ricotta variations with correct qtys and prices", () => {
       const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
       const set = result[2];
       expect(set.set!.options).toEqual([
-        { key: "6_full", label: "6 Full Size", variationId: "V_RIC_FULL", qty: 6, inStock: true },
-        { key: "12_full", label: "12 Full Size", variationId: "V_RIC_FULL", qty: 12, inStock: true },
-        { key: "24_mini", label: "24 Mini", variationId: "V_RIC_MINI", qty: 24, inStock: true },
+        { key: "6_full", label: "6 Full Size", variationId: "V_RIC_FULL", qty: 6, priceCents: 700, inStock: true },
+        { key: "12_full", label: "12 Full Size", variationId: "V_RIC_FULL", qty: 12, priceCents: 700, inStock: true },
+        { key: "24_mini", label: "24 Mini", variationId: "V_RIC_MINI", qty: 24, priceCents: 400, inStock: true },
       ]);
     });
 

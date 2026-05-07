@@ -89,6 +89,11 @@ export type SetOption = {
   label: string;
   variationId: string;
   qty: number;
+  // Per-cannoli price captured from the underlying Ricotta variation at
+  // catalog-build time. The total set subtotal is priceCents × qty (no set
+  // fee). Square recomputes pricing server-side at order-create from the
+  // variationId, so this is purely for the UI subtotal display.
+  priceCents: number;
   inStock: boolean;
 };
 

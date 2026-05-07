@@ -349,6 +349,7 @@ function buildSetComposite(
       label: spec.label,
       variationId: variation.id,
       qty: spec.qty,
+      priceCents: variation.priceCents,
       inStock: variation.inStock,
     });
   }

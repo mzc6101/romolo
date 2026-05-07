@@ -1128,16 +1128,29 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
   for (const l of order.lines) {
     const item = snapshot.items.find((i) => i.id === l.itemId);
     if (!item) continue;
-    const variations = activeVariations(item, l.fillingKey);
-    const modifierLists = activeModifierLists(item, l.fillingKey);
-    const variation = variations.find((v) => v.id === l.variationId);
-    if (!variation) continue;
-    let unitCents = variation.priceCents;
-    for (const ml of modifierLists) {
-      const selected = l.modifiers[ml.id] ?? [];
-      for (const modId of selected) {
-        const mod = ml.modifiers.find((m) => m.id === modId);
-        if (mod) unitCents += mod.priceCents;
+    let unitCents: number;
+    if (item.set) {
+      // Set lines source price from the matching SetOption (captured at
+      // catalog-build time). activeVariations returns [] for set items, so
+      // the standard variation lookup below would skip the line. The auto-
+      // applied modifiers are all $0 so they don't add to unitCents.
+      const opt = item.set.options.find(
+        (o) => o.variationId === l.variationId && o.qty === l.qty,
+      );
+      if (!opt) continue;
+      unitCents = opt.priceCents;
+    } else {
+      const variations = activeVariations(item, l.fillingKey);
+      const modifierLists = activeModifierLists(item, l.fillingKey);
+      const variation = variations.find((v) => v.id === l.variationId);
+      if (!variation) continue;
+      unitCents = variation.priceCents;
+      for (const ml of modifierLists) {
+        const selected = l.modifiers[ml.id] ?? [];
+        for (const modId of selected) {
+          const mod = ml.modifiers.find((m) => m.id === modId);
+          if (mod) unitCents += mod.priceCents;
+        }
       }
     }
     discountLines.push({
