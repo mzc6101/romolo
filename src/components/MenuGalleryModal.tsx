@@ -49,7 +49,7 @@ export function MenuGalleryModal({ item, onClose }: MenuGalleryModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full max-w-4xl max-h-[min(90vh,880px)] overflow-y-auto rounded-sm border border-romolo-border bg-white shadow-[0_24px_80px_-20px_rgba(26,26,26,0.25)] animate-[scale-in_0.35s_var(--ease-out-expo)_both]"
+        className="relative w-full max-w-4xl lg:max-w-5xl max-h-[min(90vh,880px)] overflow-y-auto rounded-sm border border-romolo-border bg-white shadow-[0_24px_80px_-20px_rgba(26,26,26,0.25)] animate-[scale-in_0.35s_var(--ease-out-expo)_both]"
       >
         <div className="sticky top-0 z-10 flex justify-end border-b border-romolo-border bg-white/95 px-4 py-3 backdrop-blur-sm md:px-8 md:py-4">
           <button
@@ -65,31 +65,61 @@ export function MenuGalleryModal({ item, onClose }: MenuGalleryModalProps) {
           </button>
         </div>
 
-        <div className="px-6 pb-10 pt-2 md:px-10 md:pb-12 md:pt-4">
-          <div className="flex items-center gap-6 mb-6">
-            <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60 shrink-0" />
-            <p className="text-base md:text-lg tracking-[0.3em] uppercase text-romolo-red font-medium m-0">
-              Gallery
-            </p>
-          </div>
-          <h2
-            id={titleId}
-            className="font-[var(--font-serif)] text-4xl md:text-5xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em] m-0 pr-4"
-          >
-            {item.name}
-          </h2>
-          {item.description ? (
-            <p className="mt-5 max-w-2xl text-[15px] md:text-[17px] text-romolo-warm-gray leading-relaxed m-0">
-              {item.description}
-            </p>
-          ) : null}
+        <div className="px-6 pb-10 pt-2 md:px-10 md:pb-12 md:pt-4 lg:pb-8 lg:pt-3">
+          {/* Top row: 'Gallery' tag aligns with 'Ordering Options' tag on lg+.
+              Below each tag sits its own content (title/description on the
+              left, options list on the right). On mobile, columns stack. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-10 lg:gap-14 items-start">
+            <div>
+              <div className="flex items-center gap-6 mb-6">
+                <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60 shrink-0" />
+                <p className="text-base md:text-lg tracking-[0.3em] uppercase text-romolo-red font-medium m-0">
+                  Gallery
+                </p>
+              </div>
+              <h2
+                id={titleId}
+                className="font-[var(--font-serif)] text-4xl md:text-5xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em] m-0 pr-4"
+              >
+                {item.name}
+              </h2>
+              {item.description ? (
+                <p className="mt-5 max-w-2xl text-[15px] md:text-[17px] text-romolo-warm-gray leading-relaxed m-0">
+                  {item.description}
+                </p>
+              ) : null}
+            </div>
 
-          <div className="h-[1px] bg-romolo-border my-10 origin-left" />
+            {item.options && item.options.length > 0 ? (
+              <div>
+                <div className="flex items-center gap-5 mb-4">
+                  <span aria-hidden className="block h-px w-10 md:w-14 bg-romolo-red/60 shrink-0" />
+                  <p className="text-xs md:text-sm tracking-[0.3em] uppercase text-romolo-red font-medium m-0">
+                    Ordering Options
+                  </p>
+                </div>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-x-8 gap-y-3.5">
+                  {item.options.map((group) => (
+                    <div key={group.label}>
+                      <dt className="font-[var(--font-serif)] text-[14px] md:text-[15px] font-medium text-romolo-charcoal leading-snug m-0">
+                        {group.label}
+                      </dt>
+                      <dd className="mt-1 text-[12px] md:text-[12.5px] text-romolo-warm-gray leading-snug m-0">
+                        {group.choices.join("  ·  ")}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="h-[1px] bg-romolo-border my-10 lg:my-7 origin-left" />
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:gap-7">
             {item.galleryUrls.map((src, i) => (
               <figure key={`${item.id}-${i}`} className="m-0 group">
-                <div className="relative aspect-square rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border">
+                <div className="relative aspect-square lg:aspect-[4/3] rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border">
                   <Image
                     src={src}
                     alt={`${item.name} — gallery photo ${i + 1} of ${item.galleryUrls.length}`}
@@ -101,30 +131,6 @@ export function MenuGalleryModal({ item, onClose }: MenuGalleryModalProps) {
               </figure>
             ))}
           </div>
-
-          {item.options && item.options.length > 0 ? (
-            <>
-              <div className="h-[1px] bg-romolo-border my-10 origin-left" />
-              <div className="flex items-center gap-6 mb-8">
-                <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60 shrink-0" />
-                <p className="text-base md:text-lg tracking-[0.3em] uppercase text-romolo-red font-medium m-0">
-                  Ordering Options
-                </p>
-              </div>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-7 max-w-3xl">
-                {item.options.map((group) => (
-                  <div key={group.label}>
-                    <dt className="font-[var(--font-serif)] text-[18px] md:text-[20px] font-medium text-romolo-charcoal leading-snug m-0">
-                      {group.label}
-                    </dt>
-                    <dd className="mt-2 text-[14px] md:text-[15px] text-romolo-warm-gray leading-relaxed m-0">
-                      {group.choices.join("  ·  ")}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          ) : null}
         </div>
       </div>
     </div>
