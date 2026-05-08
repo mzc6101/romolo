@@ -89,9 +89,32 @@ export type AutoModifierRef = {
   soldOut?: boolean;
 };
 
+// Custom-size path on the Cannoli Set composite. Surfaces the underlying
+// Full / Mini variation IDs (Ricotta + Ice Cream equivalents) plus the
+// per-size minimum qty enforced by the UI. Either side may be undefined
+// if the source item is missing that variation.
+export type SetCustomSize = {
+  variationId: string;
+  priceCents: number;
+  minQty: number;
+  inStock: boolean;
+  iceCream?: {
+    variationId: string;
+    priceCents: number;
+    inStock: boolean;
+  };
+};
+
 export type SetInfo = {
   options: SetOption[];
   autoModifiers: AutoModifierRef[];
+  // "Choose your own" custom-size path: user picks Full or Mini and a qty.
+  // Present when at least one of full/mini is resolvable; absent when
+  // neither variation exists on the source items.
+  custom?: {
+    full?: SetCustomSize;
+    mini?: SetCustomSize;
+  };
 };
 
 // One filling-type branch under the composite "Cannoli" item. `squareItemId`

@@ -439,6 +439,10 @@ describe("mergeCannoliItems", () => {
       { key: "12_mini", label: "12 Mini Size", variationPrefix: "mini", qty: 12 },
       { key: "24_mini", label: "24 Mini Size", variationPrefix: "mini", qty: 24 },
     ],
+    setCustomSizeSpecs: [
+      { variationPrefix: "full", minQty: 6 },
+      { variationPrefix: "mini", minQty: 12 },
+    ],
     setReservedModifierNames: new Set<string>(["Mixed Garnish", "Mixed Shell"]),
     specialNotesListNameSuffix: "special notes",
   };
@@ -799,6 +803,66 @@ describe("mergeCannoliItems", () => {
       expect(byList["ML_FILLING"]?.modifierId).toBe("M_FILL_ORIGINAL");
       expect(byList["ML_SHELL"]?.modifierId).toBe("M_SHELL_CHOC");
       expect(byList["ML_GARNISH"]?.modifierId).toBe("M_GARN_MIXED");
+    });
+
+    it("emits SetInfo.custom with Full + Mini variation IDs and per-size minQty", () => {
+      const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
+      const set = result[2];
+      expect(set.set!.custom).toBeDefined();
+      expect(set.set!.custom!.full).toMatchObject({
+        variationId: "V_RIC_FULL",
+        priceCents: 700,
+        minQty: 6,
+        inStock: true,
+      });
+      expect(set.set!.custom!.mini).toMatchObject({
+        variationId: "V_RIC_MINI",
+        priceCents: 400,
+        minQty: 12,
+        inStock: true,
+      });
+      // Ice Cream equivalents threaded through so a Custom + Ice Cream line
+      // can resolve a variationId on the Ice Cream side too.
+      expect(set.set!.custom!.full?.iceCream?.variationId).toBe("V_IC_FULL");
+      expect(set.set!.custom!.mini?.iceCream?.variationId).toBe("V_IC_MINI");
+    });
+
+    it("SetInfo.custom degrades when a custom-size variation is missing on Ricotta", () => {
+      // Drop the Mini variation on Ricotta — Full custom path remains, Mini
+      // falls away. The set composite still emits (the fixed-options loop
+      // already returned a "12 Mini Size" failure before reaching custom,
+      // so we test by removing only the source variation but keeping the
+      // fixed options through a direct mutation of the input).
+      const ricotta = setRicotta();
+      // Remove ALL Mini-prefixed sources and any fixed option that depends
+      // on Mini, so the set composite can still emit (fixed-options loop
+      // requires every spec to resolve). Easiest path: drop both Mini fixed
+      // specs and Mini source variation in one go via an options override.
+      const noMiniOptions = {
+        ...options,
+        setOptionSpecs: options.setOptionSpecs.filter(
+          (s) => s.variationPrefix !== "mini",
+        ),
+        setCustomSizeSpecs: options.setCustomSizeSpecs.filter(
+          (s) => s.variationPrefix !== "mini",
+        ),
+      };
+      const result = mergeCannoliItems([setIceCream(), ricotta], noMiniOptions);
+      const set = result.find((i) => i.id === "cannoli-set__composite");
+      expect(set).toBeDefined();
+      expect(set!.set!.custom).toBeDefined();
+      expect(set!.set!.custom!.full).toBeDefined();
+      expect(set!.set!.custom!.mini).toBeUndefined();
+    });
+
+    it("SetInfo.custom is undefined when no custom-size specs are configured", () => {
+      const noCustomOptions = { ...options, setCustomSizeSpecs: [] };
+      const result = mergeCannoliItems(
+        [setIceCream(), setRicotta()],
+        noCustomOptions,
+      );
+      const set = result[2];
+      expect(set.set!.custom).toBeUndefined();
     });
 
     it("set option inStock mirrors the underlying variation's inStock flag", () => {

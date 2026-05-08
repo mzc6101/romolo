@@ -35,8 +35,13 @@ const SET_OPTION_SPECS = [
   { key: "12_mini", label: "12 Mini", variationPrefix: "mini", qty: 12 },
   { key: "24_mini", label: "24 Mini", variationPrefix: "mini", qty: 24 },
 ] as const;
+const SET_CUSTOM_SIZE_SPECS = [
+  { variationPrefix: "full", minQty: 6 },
+  { variationPrefix: "mini", minQty: 12 },
+] as const;
 const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
   "Mixed Garnish",
+  "Mixed Shell",
 ]);
 const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
@@ -127,6 +132,7 @@ async function main() {
     setCompositeId: SET_COMPOSITE_ID,
     setAutoModifiers: SET_AUTO_MODIFIERS,
     setOptionSpecs: SET_OPTION_SPECS,
+    setCustomSizeSpecs: SET_CUSTOM_SIZE_SPECS,
     setReservedModifierNames: SET_RESERVED_MODIFIER_NAMES,
     specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });

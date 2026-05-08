@@ -118,6 +118,13 @@ const SET_OPTION_SPECS = [
   { key: "12_mini", label: "12 Mini Size", variationPrefix: "mini", qty: 12 },
   { key: "24_mini", label: "24 Mini Size", variationPrefix: "mini", qty: 24 },
 ] as const;
+// "Choose your own" path: user picks size (Full / Mini) and a qty above the
+// per-size minimum. Mirror SET_OPTION_SPECS' size keys so resolution from
+// variation prefix → minQty stays straightforward.
+const SET_CUSTOM_SIZE_SPECS = [
+  { variationPrefix: "full", minQty: 6 },
+  { variationPrefix: "mini", minQty: 12 },
+] as const;
 // Modifier OPTION names that exist in Square but should NOT surface as user-
 // pickable choices on the regular Cannoli or Cannoli Kit composites — they
 // are reserved for the Set composite (Mixed Garnish is auto-applied in the
@@ -228,6 +235,7 @@ export async function getCatalog(): Promise<{ items: SnapshotItem[] }> {
     setCompositeId: SET_COMPOSITE_ID,
     setAutoModifiers: SET_AUTO_MODIFIERS,
     setOptionSpecs: SET_OPTION_SPECS,
+    setCustomSizeSpecs: SET_CUSTOM_SIZE_SPECS,
     setReservedModifierNames: SET_RESERVED_MODIFIER_NAMES,
     specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });

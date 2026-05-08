@@ -1,6 +1,7 @@
 import type {
   AutoModifierRef,
   CannoliFilling,
+  SetCustomSize,
   SetInfo,
   SetOption,
   SnapshotItem,
@@ -59,6 +60,10 @@ export function mergeCannoliItems(
       label: string;
       variationPrefix: string;
       qty: number;
+    }>;
+    setCustomSizeSpecs: ReadonlyArray<{
+      variationPrefix: string;
+      minQty: number;
     }>;
     setReservedModifierNames: ReadonlySet<string>;
     specialNotesListNameSuffix: string;
@@ -295,6 +300,10 @@ function buildSetComposite(
       variationPrefix: string;
       qty: number;
     }>;
+    setCustomSizeSpecs: ReadonlyArray<{
+      variationPrefix: string;
+      minQty: number;
+    }>;
     kitModifierListName: string;
     multipleBoxesModifierListName: string;
     specialNotesListNameSuffix: string;
@@ -418,7 +427,46 @@ function buildSetComposite(
     },
   ];
 
-  const set: SetInfo = { options: setOptions, autoModifiers };
+  // "Choose your own" custom-size path. Resolves Full + Mini variations
+  // from each spec's prefix, mirroring the fixed-option resolution above
+  // but without committing to a fixed qty. Either side may degrade to
+  // undefined if the source variation is missing — UI hides whichever side
+  // can't be ordered. The wrapping `custom` field stays undefined when
+  // neither side resolves, so OrderFlow can detect "no custom path".
+  const customSizes: { full?: SetCustomSize; mini?: SetCustomSize } = {};
+  for (const spec of options.setCustomSizeSpecs) {
+    const variation = ricotta.variations.find((v) =>
+      v.name.toLowerCase().trim().startsWith(spec.variationPrefix),
+    );
+    if (!variation) continue;
+    const iceCreamVariation = iceCream.variations.find((v) =>
+      v.name.toLowerCase().trim().startsWith(spec.variationPrefix),
+    );
+    const entry: SetCustomSize = {
+      variationId: variation.id,
+      priceCents: variation.priceCents,
+      minQty: spec.minQty,
+      inStock: variation.inStock,
+      ...(iceCreamVariation
+        ? {
+            iceCream: {
+              variationId: iceCreamVariation.id,
+              priceCents: iceCreamVariation.priceCents,
+              inStock: iceCreamVariation.inStock,
+            },
+          }
+        : {}),
+    };
+    if (spec.variationPrefix === "full") customSizes.full = entry;
+    else if (spec.variationPrefix === "mini") customSizes.mini = entry;
+  }
+  const hasCustom = !!(customSizes.full || customSizes.mini);
+
+  const set: SetInfo = {
+    options: setOptions,
+    autoModifiers,
+    ...(hasCustom ? { custom: customSizes } : {}),
+  };
 
   return {
     id: options.setCompositeId,

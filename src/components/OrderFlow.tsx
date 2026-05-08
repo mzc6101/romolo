@@ -14,6 +14,7 @@ import { SectionHeading } from "./order/SectionHeading";
 import { SquareCard, type SquareCardHandle } from "./order/SquareCard";
 import type {
   MenuSnapshot,
+  SetCustomSize,
   SnapshotItem,
   SnapshotModifierList,
   SnapshotVariation,
@@ -31,6 +32,11 @@ type OrderLine = {
   qty: number;
   modifiers: Record<string, string[]>; // modifierListId -> selected modifier ids
   freeText: Record<string, string>;    // modifierListId (TEXT) -> entered text
+  // Cannoli Set lines only. When true, the line is using the "Choose your
+  // own" custom-size path: variationId is a Full or Mini variation and qty
+  // is user-controlled (above the size's minQty). Fixed-chip lines leave
+  // this undefined and match a SetOption via findSetOption.
+  setCustom?: boolean;
 };
 
 function activeVariations(
@@ -87,6 +93,27 @@ function findSetOption(
   );
 }
 
+// Resolves the active "Choose your own" size for a custom-mode line. Matches
+// the line's variationId against the Full / Mini variation IDs (Ricotta or
+// Ice Cream side, mirroring findSetOption). Returns the matched
+// SetCustomSize plus a "full" | "mini" key so callers can read minQty / pick
+// labels. Returns null when no match — line.variationId hasn't been set yet
+// or points at something else.
+function findSetCustomSize(
+  item: SnapshotItem,
+  line: { variationId: string },
+): { key: "full" | "mini"; size: SetCustomSize } | null {
+  const custom = item.set?.custom;
+  if (!custom) return null;
+  const matches = (size?: SetCustomSize) =>
+    !!size &&
+    (size.variationId === line.variationId ||
+      size.iceCream?.variationId === line.variationId);
+  if (matches(custom.full)) return { key: "full", size: custom.full! };
+  if (matches(custom.mini)) return { key: "mini", size: custom.mini! };
+  return null;
+}
+
 // Builds the per-line payload sent to /api/orders and /api/orders/calculate.
 // Reused by both place-order submission (StepPay) and totals fetching
 // (OrderSummary) so the calculate result and the placed-order total match
@@ -97,8 +124,16 @@ function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
   const noteParts: string[] = [];
   if (item) {
     if (item.set && line.variationId) {
-      const opt = findSetOption(item, line);
-      if (opt) noteParts.push(`Set: ${opt.label}`);
+      if (line.setCustom) {
+        const match = findSetCustomSize(item, line);
+        if (match) {
+          const sizeLabel = match.key === "full" ? "Full Size" : "Mini Size";
+          noteParts.push(`Set: ${line.qty} ${sizeLabel} (Custom)`);
+        }
+      } else {
+        const opt = findSetOption(item, line);
+        if (opt) noteParts.push(`Set: ${opt.label}`);
+      }
     }
     if (item.kit) {
       // Mirrors the Set composite: a fixed prefix on the cannoli line so the
@@ -318,18 +353,31 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
     if (line.qty % item.kit.groupSize !== 0) return false;
   }
   if (item.set) {
-    // Set lines must match exactly one of the predefined size options.
-    // The variationId can match either the Ricotta or Ice Cream side of the
-    // option; findSetOption handles both. inStock is checked against the
-    // side actually in use (driven by fillingKey).
     if (!line.variationId) return false;
-    const opt = findSetOption(item, line);
-    if (!opt) return false;
-    const sideInStock =
-      line.fillingKey === "ice_cream"
-        ? !!opt.iceCream?.inStock
-        : opt.inStock;
-    if (!sideInStock) return false;
+    if (line.setCustom) {
+      // "Choose your own" path: variationId must match Full or Mini, qty
+      // must clear that size's minimum, and the selected side (Ricotta vs
+      // Ice Cream) must be in stock.
+      const match = findSetCustomSize(item, line);
+      if (!match) return false;
+      if (line.qty < match.size.minQty) return false;
+      const sideInStock =
+        line.fillingKey === "ice_cream"
+          ? !!match.size.iceCream?.inStock
+          : match.size.inStock;
+      if (!sideInStock) return false;
+    } else {
+      // Fixed-chip path: line must match exactly one of the predefined size
+      // options. findSetOption resolves Ricotta or Ice Cream side; inStock
+      // is checked against the side actually in use.
+      const opt = findSetOption(item, line);
+      if (!opt) return false;
+      const sideInStock =
+        line.fillingKey === "ice_cream"
+          ? !!opt.iceCream?.inStock
+          : opt.inStock;
+      if (!sideInStock) return false;
+    }
   }
   const variations = activeVariations(item, line.fillingKey);
   const modifierLists = activeModifierLists(item, line.fillingKey);
@@ -393,13 +441,29 @@ function listMissingForLine(
     missing.push("filling");
   }
   if (item.set) {
-    const opt = findSetOption(item, line);
-    const sideInStock =
-      opt &&
-      (line.fillingKey === "ice_cream"
-        ? !!opt.iceCream?.inStock
-        : opt.inStock);
-    if (!opt || !sideInStock) missing.push("size");
+    if (line.setCustom) {
+      // Custom path: report "size" if no Full/Mini variation picked, "qty"
+      // when the user is below the size's minimum.
+      const match = findSetCustomSize(item, line);
+      const sideInStock =
+        match &&
+        (line.fillingKey === "ice_cream"
+          ? !!match.size.iceCream?.inStock
+          : match.size.inStock);
+      if (!match || !sideInStock) {
+        missing.push("size");
+      } else if (line.qty < match.size.minQty) {
+        missing.push("qty");
+      }
+    } else {
+      const opt = findSetOption(item, line);
+      const sideInStock =
+        opt &&
+        (line.fillingKey === "ice_cream"
+          ? !!opt.iceCream?.inStock
+          : opt.inStock);
+      if (!opt || !sideInStock) missing.push("size");
+    }
   }
 
   const variations = activeVariations(item, line.fillingKey);
@@ -1248,6 +1312,7 @@ function OrderLineEditor({
       qty: 1,
       modifiers: {},
       freeText: {},
+      setCustom: undefined,
     });
 
   const onFillingChange = (key: string) => {
@@ -1275,27 +1340,71 @@ function OrderLineEditor({
     const opt = item.set.options.find((o) => o.key === key);
     if (!opt) return;
     // The line tracks the variation matching the currently-picked filling
-    // side (Ricotta default, Ice Cream when the user switches).
+    // side (Ricotta default, Ice Cream when the user switches). Picking a
+    // fixed chip exits any in-progress Custom-mode selection.
     const variationId =
       line.fillingKey === "ice_cream"
         ? (opt.iceCream?.variationId ?? "")
         : opt.variationId;
-    onChange({ variationId, qty: opt.qty });
+    onChange({ variationId, qty: opt.qty, setCustom: undefined });
+  };
+
+  // Picks the "Choose your own" path. Defaults to Full size at its minimum
+  // qty (or Mini if Full isn't resolvable). The user can then switch
+  // size / qty via the inline controls. Re-clicks while already custom are
+  // a no-op so the user's current size+qty isn't reset.
+  const onSetCustomEnter = () => {
+    if (!item.set?.custom) return;
+    if (line.setCustom) return;
+    const fallback = item.set.custom.full ?? item.set.custom.mini;
+    if (!fallback) return;
+    const variationId =
+      line.fillingKey === "ice_cream"
+        ? (fallback.iceCream?.variationId ?? "")
+        : fallback.variationId;
+    onChange({
+      variationId,
+      qty: fallback.minQty,
+      setCustom: true,
+    });
+  };
+
+  const onSetCustomSizeChange = (key: "full" | "mini") => {
+    if (!item.set?.custom) return;
+    const next = key === "full" ? item.set.custom.full : item.set.custom.mini;
+    if (!next) return;
+    const variationId =
+      line.fillingKey === "ice_cream"
+        ? (next.iceCream?.variationId ?? "")
+        : next.variationId;
+    // Bump qty up to the new size's minimum if the user was below it
+    // (switching Full→Mini with qty=6 jumps to 12). Leave higher qty alone.
+    const qty = Math.max(line.qty, next.minQty);
+    onChange({ variationId, qty, setCustom: true });
   };
 
   // Filling-type chip on a Set line. Switching wipes all modifier selections
   // (the auto-recipe is Ricotta-specific and has no Ice Cream analogue) and
   // re-resolves the variationId to the new filling's equivalent for the
-  // current size.
+  // current size — handles both fixed-chip and Custom-mode lines.
   const onSetFillingChange = (key: string) => {
     if (!item.set) return;
     const filling = item.cannoliFillings?.find((f) => f.key === key);
     if (!filling) return;
-    const opt = findSetOption(item, line);
-    const newVariationId =
-      key === "ice_cream"
-        ? (opt?.iceCream?.variationId ?? "")
-        : (opt?.variationId ?? "");
+    let newVariationId = "";
+    if (line.setCustom) {
+      const match = findSetCustomSize(item, line);
+      newVariationId =
+        key === "ice_cream"
+          ? (match?.size.iceCream?.variationId ?? "")
+          : (match?.size.variationId ?? "");
+    } else {
+      const opt = findSetOption(item, line);
+      newVariationId =
+        key === "ice_cream"
+          ? (opt?.iceCream?.variationId ?? "")
+          : (opt?.variationId ?? "");
+    }
     const { modifiers, freeText } = seedSelectionsForLists(
       [...filling.modifierLists, ...item.modifierLists],
       key === "ricotta" ? item.set.autoModifiers : [],
@@ -1400,24 +1509,43 @@ function OrderLineEditor({
 
       {item.set && (() => {
         const picked = findSetOption(item, line);
-        const sideInStock =
+        const customMatch = findSetCustomSize(item, line);
+        const customActive = !!line.setCustom;
+        const sidePicked =
+          line.fillingKey === "ice_cream" ? "ice_cream" : "ricotta";
+        const fixedSideInStock =
           picked &&
-          (line.fillingKey === "ice_cream"
+          (sidePicked === "ice_cream"
             ? !!picked.iceCream?.inStock
             : picked.inStock);
-        const setSizeState: "required" | "satisfied" =
-          picked && sideInStock ? "satisfied" : "required";
+        const customSideInStock =
+          customMatch &&
+          (sidePicked === "ice_cream"
+            ? !!customMatch.size.iceCream?.inStock
+            : customMatch.size.inStock);
+        const customQtyOk = customMatch
+          ? line.qty >= customMatch.size.minQty
+          : false;
+        const setSizeState: "required" | "satisfied" = customActive
+          ? customMatch && customSideInStock && customQtyOk
+            ? "satisfied"
+            : "required"
+          : picked && fixedSideInStock
+            ? "satisfied"
+            : "required";
+        const customAvailable = !!item.set!.custom;
         return (
         <div className="mb-4">
           <SectionHeading label="Set Size" state={setSizeState} />
           <div className="flex flex-wrap gap-2">
-            {item.set.options.map((o) => {
+            {item.set!.options.map((o) => {
               const sel =
+                !customActive &&
                 (o.variationId === line.variationId ||
                   o.iceCream?.variationId === line.variationId) &&
                 o.qty === line.qty;
               const disabled =
-                line.fillingKey === "ice_cream"
+                sidePicked === "ice_cream"
                   ? !o.iceCream?.inStock
                   : !o.inStock;
               return (
@@ -1438,7 +1566,81 @@ function OrderLineEditor({
                 </button>
               );
             })}
+            {customAvailable && (
+              <button
+                type="button"
+                onClick={onSetCustomEnter}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  customActive
+                    ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                    : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
+                }`}
+              >
+                Choose your own
+              </button>
+            )}
           </div>
+          {customActive && item.set!.custom && (() => {
+            const fullSize = item.set!.custom!.full;
+            const miniSize = item.set!.custom!.mini;
+            const activeKey = customMatch?.key ?? "full";
+            const activeSize = customMatch?.size ?? fullSize ?? miniSize!;
+            const activeMin = activeSize.minQty;
+            return (
+              <div className="mt-3 pl-3 border-l border-romolo-border space-y-3">
+                <div>
+                  <div className="text-[10px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
+                    Size
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: "full" as const, label: "Full Size", size: fullSize },
+                      { key: "mini" as const, label: "Mini Size", size: miniSize },
+                    ])
+                      .filter((opt) => !!opt.size)
+                      .map((opt) => {
+                        const sel = activeKey === opt.key;
+                        const sizeInStock =
+                          sidePicked === "ice_cream"
+                            ? !!opt.size!.iceCream?.inStock
+                            : opt.size!.inStock;
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            disabled={!sizeInStock}
+                            onClick={() => onSetCustomSizeChange(opt.key)}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                              !sizeInStock
+                                ? "bg-romolo-cream/60 text-romolo-warm-gray/50 border-romolo-border line-through cursor-not-allowed"
+                                : sel
+                                  ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                                  : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
+                    Qty{" "}
+                    <span className="normal-case tracking-normal text-[11px] text-romolo-warm-gray/70">
+                      (min {activeMin})
+                    </span>
+                  </div>
+                  <QtyStepper
+                    qty={line.qty}
+                    step={1}
+                    min={activeMin}
+                    onChange={(v) => onChange({ qty: v })}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
         );
       })()}
@@ -1761,8 +1963,16 @@ function summarizeLine(line: OrderLine, item: SnapshotItem): string {
   // configuration (shell / filling flavor / garnish / etc.) flows from the
   // standard modifier-list summary below.
   if (item.set) {
-    const opt = findSetOption(item, line);
-    if (opt) parts.push(opt.label);
+    if (line.setCustom) {
+      const match = findSetCustomSize(item, line);
+      if (match) {
+        const sizeLabel = match.key === "full" ? "Full Size" : "Mini Size";
+        parts.push(`${line.qty} ${sizeLabel} (Custom)`);
+      }
+    } else {
+      const opt = findSetOption(item, line);
+      if (opt) parts.push(opt.label);
+    }
     const filling = item.cannoliFillings?.find((f) => f.key === line.fillingKey);
     if (filling) parts.push(filling.label);
   } else if (item.cannoliFillings) {
