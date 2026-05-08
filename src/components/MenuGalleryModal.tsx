@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useId, useRef } from "react";
 import type { MenuItem } from "@/lib/data";
 
@@ -7,8 +8,6 @@ type MenuGalleryModalProps = {
   item: MenuItem | null;
   onClose: () => void;
 };
-
-const PLACEHOLDER_COUNT = 3;
 
 export function MenuGalleryModal({ item, onClose }: MenuGalleryModalProps) {
   const open = item !== null;
@@ -88,21 +87,17 @@ export function MenuGalleryModal({ item, onClose }: MenuGalleryModalProps) {
           <div className="h-[1px] bg-romolo-border my-10 origin-left" />
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 md:gap-7">
-            {Array.from({ length: PLACEHOLDER_COUNT }, (_, i) => (
-              <figure key={i} className="m-0">
-                <div className="relative aspect-square rounded-sm overflow-hidden bg-romolo-cream border border-dashed border-romolo-border flex flex-col items-center justify-center gap-2 px-4 text-center">
-                  <span className="text-[11px] tracking-[0.2em] uppercase text-romolo-warm-gray/80">
-                    Placeholder
-                  </span>
-                  <span className="font-[var(--font-serif)] text-lg md:text-xl font-light text-romolo-charcoal/70">
-                    Image {i + 1}
-                  </span>
+            {item.galleryUrls.map((src, i) => (
+              <figure key={`${item.id}-${i}`} className="m-0 group">
+                <div className="relative aspect-square rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border">
+                  <Image
+                    src={src}
+                    alt={`${item.name} — gallery photo ${i + 1} of ${item.galleryUrls.length}`}
+                    fill
+                    className="object-cover transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-[1.05]"
+                    sizes="(min-width: 1024px) 28vw, (min-width: 640px) 30vw, 90vw"
+                  />
                 </div>
-                <figcaption className="pt-3 text-center">
-                  <span className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray">
-                    Coming soon
-                  </span>
-                </figcaption>
               </figure>
             ))}
           </div>

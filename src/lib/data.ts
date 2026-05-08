@@ -9,6 +9,9 @@
  * `getCatalog()` and `getOpenPeriods()` from `lib/square/`.
  */
 
+/** Three images shown in the menu item lightbox gallery. */
+export type MenuGalleryUrls = readonly [string, string, string];
+
 export type MenuItem = {
   id: string;
   name: string;
@@ -16,6 +19,8 @@ export type MenuItem = {
   price: number;
   /** Optional thumbnail in the menu grid */
   imageUrl?: string;
+  /** Full gallery for this item (lightbox). */
+  galleryUrls: MenuGalleryUrls;
 };
 
 export type MenuCategory = {
@@ -36,6 +41,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 4.5,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679870/_N8Z0944_odj3da.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679870/_N8Z0944_odj3da.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775678635/_N8Z0762_bsvral.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208102/_N8Z0653_yul3bg.jpg",
+        ],
       },
       {
         id: "cannoli-mini",
@@ -44,6 +54,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 2.25,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328556/_N8Z0787_acdfse.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208836/_N8Z0647_du5jdg.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328556/_N8Z0787_acdfse.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208836/_N8Z0658_eqz1yw.jpg",
+        ],
       },
       {
         id: "cannoli-kit",
@@ -53,6 +68,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 18.0,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679842/_N8Z0606_wcehwu.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208596/_N8Z0617_rlml9t.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208180/_N8Z0841_ym5wta.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208645/_N8Z0577_obul7k.jpg",
+        ],
       },
     ],
   },
@@ -67,6 +87,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 3.5,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208978/_N8Z0618_auxdeb.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208979/_N8Z0928_q1jbrx.jpg",
+        ],
       },
       {
         id: "cookie",
@@ -75,6 +100,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 2.0,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328740/_N8Z0782_lir3xp.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328740/_N8Z0782_lir3xp.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209133/_N8Z0952_wtpsj1.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209143/_N8Z0947_qejilj.jpg",
+        ],
       },
       {
         id: "spumoni",
@@ -83,6 +113,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 5.5,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328772/_N8Z0935_ggdfvc.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328772/_N8Z0935_ggdfvc.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328740/_N8Z0782_lir3xp.jpg",
+        ],
       },
       {
         id: "tartufi",
@@ -91,6 +126,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 6.0,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328834/_N8Z0941_g0bjmw.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328834/_N8Z0941_g0bjmw.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209283/_N8Z0939_th8imo.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208102/_N8Z0653_yul3bg.jpg",
+        ],
       },
       {
         id: "tiramisu",
@@ -99,6 +139,11 @@ export const MENU_DATA: MenuCategory[] = [
         price: 7.5,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328873/_N8Z0797-Edit_jvlpx4.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328873/_N8Z0797-Edit_jvlpx4.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209384/_N8Z0804_cmrtim.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209398/_N8Z0794-Edit_ghtqgl.jpg",
+        ],
       },
     ],
   },
@@ -113,12 +158,22 @@ export const MENU_DATA: MenuCategory[] = [
         price: 4.0,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328923/_N8Z0923_t1i9rl.jpg",
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209506/_N8Z0814_kgm7vc.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209526/_N8Z0808_bqtskg.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209505/_N8Z0809_aqicfp.jpg",
+        ],
       },
       {
         id: "milkshake",
         name: "Milkshake",
         description: "Thick, blended with house-made ice cream",
         price: 6.5,
+        galleryUrls: [
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328923/_N8Z0923_t1i9rl.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328873/_N8Z0797-Edit_jvlpx4.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
+        ],
       },
     ],
   },
