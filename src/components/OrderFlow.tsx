@@ -510,7 +510,16 @@ export default function OrderFlow() {
       return;
     }
 
-    const pickupAt = new Date(`${order.date}T${convert12to24(order.time)}:00`).toISOString();
+    // Anchor to the shop's tz (from snapshot.hours.timezone) instead of the
+    // browser's. The slot grid in StepWhen lists Pacific times — without this,
+    // a non-Pacific browser interprets "12:00pm" as their local 12pm and
+    // Square stores a UTC instant that decodes to the wrong Pacific wall
+    // clock. See pacificToUtcIso for the offset math.
+    const pickupAt = pacificToUtcIso(
+      order.date,
+      convert12to24(order.time),
+      snapshot.hours.timezone,
+    );
 
     // Fresh key per attempt: Square idempotency returns the same response for
     // the same key, so reusing it after a decline would echo the decline
@@ -1940,6 +1949,24 @@ function StepPay({
       <SquareCard onReady={(h) => setCardHandle(h)} />
     </div>
   );
+}
+
+// Converts a wall-clock date+time in the shop's tz (e.g. "2026-05-08", "12:00",
+// "America/Los_Angeles") to an RFC 3339 UTC instant. Built around Intl rather
+// than a tz library: format the naive instant as if it were UTC, ask Intl what
+// the shop's offset is at that moment (DST-aware), then shift by that offset.
+function pacificToUtcIso(date: string, time24: string, tz: string): string {
+  const naive = new Date(`${date}T${time24}:00Z`);
+  const offsetName = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    timeZoneName: "shortOffset",
+  })
+    .formatToParts(naive)
+    .find((p) => p.type === "timeZoneName")!.value;
+  const m = offsetName.match(/GMT([+-])(\d+)(?::(\d+))?/)!;
+  const offsetMin =
+    (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0));
+  return new Date(naive.getTime() - offsetMin * 60000).toISOString();
 }
 
 function convert12to24(t: string): string {
