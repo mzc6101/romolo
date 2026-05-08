@@ -73,8 +73,8 @@ export default function Menu() {
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray text-center px-3">
-                            {item.name}
+                          <span className="text-[11px] tracking-[0.15em] text-romolo-warm-gray text-center px-3">
+                            Coming Soon
                           </span>
                         </div>
                       )}
