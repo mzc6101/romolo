@@ -53,19 +53,11 @@ export default function Navbar() {
               }}
             >
               <Image
-                src="/RmLogoWhite.png"
-                alt="Romolo logo"
-                width={140}
-                height={36}
-                className={`hidden xl:block absolute right-full mr-5 h-8 w-auto object-contain pointer-events-none select-none transition-opacity duration-500 ${
-                  scrolled ? "opacity-0" : "opacity-100"
-                }`}
-              />
-              <Image
                 src="/RmLogo.png"
                 alt="Romolo logo"
                 width={140}
                 height={36}
+                aria-hidden={!scrolled}
                 className={`hidden xl:block absolute right-full mr-5 h-8 w-auto object-contain pointer-events-none select-none transition-opacity duration-500 ${
                   scrolled ? "opacity-100" : "opacity-0"
                 }`}
