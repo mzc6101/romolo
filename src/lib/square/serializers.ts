@@ -1,46 +1,45 @@
 import type {
+  AutoModifierRef,
+  CannoliFilling,
   SetInfo,
+  SetOption,
   SnapshotItem,
   SnapshotModifierList,
   SnapshotModifier,
   SnapshotVariation,
 } from "./types";
 
-// Merges Square's per-filling Cannoli items into composite frontend items.
-// Three composites are emitted (in order, at the position of the first
-// underlying source item):
+// Merges Square's two filling-type Cannoli items ("Cannoli Online - Ice Cream",
+// "Cannoli Online - Ricotta") into composite frontend items. Square models
+// filling type as separate items because modifier lists can't be scoped to
+// specific variations — so the merge happens here on the frontend instead.
 //
-//   1. "Cannoli" — full menu (both fillings, both sizes, all modifier lists
-//      except the kit modifier list and Multiple Boxes).
+// Up to three composites are emitted (in order, at the position of the
+// first underlying filling):
+//   1. "Cannoli" — full menu (both sizes, all modifier lists except the kit
+//      modifier list, which is reserved for the kit composite).
 //   2. "Cannoli Kit" — Full Size only, modifier lists minus Multiple Boxes
 //      and minus the Kit modifier list (the kit fee is auto-applied at
 //      submit, so the user shouldn't see the toggle). Tagged with KitInfo so
 //      the frontend can drive qty stepping by groupSize and submit the
 //      override.
-//   3. "Cannoli Set" — passthrough of the "Cannoli Online - Set" Square item.
-//      Variations are real (size options 6 Full / 12 Full / 12 Mini / 24
-//      Mini); the filling-type chooser is a real Square modifier list ("Cannoli
-//      Set Filling": Ricotta / Ice Cream). SetInfo carries the conditional-
-//      visibility map (which lists show only for Ricotta vs Ice Cream) and the
-//      default recipe (Ricotta + Original / Chocolate / Mixed Garnish) the
-//      frontend pre-fills when a Set line is added.
+//   3. "Cannoli Set" — fixed-recipe Ricotta build (Ricotta + Chocolate +
+//      Mixed) sold in three sizes (6 Full / 12 Full / 24 Mini). Tagged with
+//      SetInfo carrying the size options and auto-applied modifier ids.
+//      Emitted only when all auto modifiers, both variations, and the
+//      Special Notes list resolve on the Ricotta item.
 //
-// Composites 1 and 2 require BOTH the Ice Cream and Ricotta items. Composite
-// 3 requires the new Set item plus its filling-type list — emitted independently
-// from the others.
+// Reserved modifier options (e.g. the Mixed garnish) are stripped from the
+// regular and kit composites so they only surface as the auto-applied set
+// recipe, never as a user-selectable choice on other composites.
 //
-// Reserved modifier options (e.g. Mixed Garnish, Mixed Shell) are stripped
-// from composites 1 and 2 so they only surface on the Set, never as a user
-// pick on a non-set Cannoli line.
-//
-// If a source item is missing the corresponding composites are skipped; the
-// rest of the menu still renders.
+// If only one filling exists, no composite is produced — that filling passes
+// through untouched. Items not matching either name pass through untouched.
 export function mergeCannoliItems(
   items: SnapshotItem[],
   options: {
     iceCreamItemName: string;
     ricottaItemName: string;
-    setItemName: string;
     compositeName: string;
     compositeId: string;
     kitCompositeName: string;
@@ -51,57 +50,34 @@ export function mergeCannoliItems(
     perKitFeeCents: number;
     setCompositeName: string;
     setCompositeId: string;
-    setFillingTypeListName: string;
-    setRicottaOptionName: string;
-    setIceCreamOptionName: string;
-    // Suffix-matched against modifier list names on the Set item to classify
-    // each list as ricotta-only or ice-cream-only. Lists matching neither
-    // bucket (e.g. Multiple Boxes, Special Notes) render unconditionally.
-    ricottaOnlyListSuffixes: ReadonlyArray<string>;
-    iceCreamOnlyListSuffixes: ReadonlyArray<string>;
-    // Default-recipe option names looked up by name in the Set item's
-    // modifier lists. Each maps to a list-suffix → option-name pair.
-    setDefaults: {
-      ricottaFillingListSuffix: string;
-      ricottaFillingOptionName: string;
-      shellListSuffix: string;
-      shellOptionName: string;
-      garnishListSuffix: string;
-      garnishOptionName: string;
-    };
+    setAutoModifiers: ReadonlyArray<{
+      listNameSuffix: string;
+      modifierName: string;
+    }>;
+    setOptionSpecs: ReadonlyArray<{
+      key: string;
+      label: string;
+      variationPrefix: string;
+      qty: number;
+    }>;
     setReservedModifierNames: ReadonlySet<string>;
+    specialNotesListNameSuffix: string;
   }
 ): SnapshotItem[] {
   const iceCream = items.find((i) => i.name === options.iceCreamItemName);
   const ricotta = items.find((i) => i.name === options.ricottaItemName);
-  const setItem = items.find((i) => i.name === options.setItemName);
-
-  const cannoliPossible = !!iceCream && !!ricotta;
-  let cannoliEmitted = false;
-  let setEmitted = false;
-  const cannoliSetComposite = setItem ? buildSetComposite(setItem, options) : null;
+  const compositePossible = !!iceCream && !!ricotta;
+  let compositeEmitted = false;
 
   const result: SnapshotItem[] = [];
   for (const item of items) {
-    if (cannoliPossible && (item === iceCream || item === ricotta)) {
-      if (!cannoliEmitted) {
+    if (compositePossible && (item === iceCream || item === ricotta)) {
+      if (!compositeEmitted) {
         result.push(buildRegularComposite(iceCream!, ricotta!, options));
         result.push(buildKitComposite(iceCream!, ricotta!, options));
-        cannoliEmitted = true;
-        // Slot the Set composite in next to its siblings when both groupings
-        // would otherwise emit at different positions. Keeps the on-page
-        // order Cannoli → Kit → Set, matching how the picker categorizes them.
-        if (cannoliSetComposite && !setEmitted) {
-          result.push(cannoliSetComposite);
-          setEmitted = true;
-        }
-      }
-      continue;
-    }
-    if (setItem && item === setItem) {
-      if (cannoliSetComposite && !setEmitted) {
-        result.push(cannoliSetComposite);
-        setEmitted = true;
+        const setComposite = buildSetComposite(iceCream!, ricotta!, options);
+        if (setComposite) result.push(setComposite);
+        compositeEmitted = true;
       }
       continue;
     }
@@ -251,155 +227,166 @@ export function stripHiddenModifierOptions(
   }));
 }
 
-// Transforms the "Cannoli Online - Set" Square item into the Set composite.
-// Returns null (and logs a warning) when the filling-type list ("Cannoli Set
-// Filling") or its two options (Ricotta / Ice Cream) can't be resolved — the
-// rest of the menu keeps working without the Set.
+// Resolves the Cannoli Set composite from the Ricotta item. Returns null
+// (no error) when any of the three auto modifiers, the Special Notes list,
+// or one of the size variations can't be resolved on Ricotta — the rest of
+// the menu keeps working and the operator gets a console warning.
 //
-// Default-recipe lookups (Original filling, Chocolate shell, Mixed Garnish)
-// degrade gracefully: if any can't be resolved by name, that default just
-// isn't pre-filled. The Set composite still emits and the user picks
-// manually.
-//
-// The Cannoli Ricotta Filling list is overridden to MULTIPLE + max=null on
-// the Set composite specifically (the user has confirmed Square's saved
-// per-attachment data is unreliable in sandbox; intent is multi-select with
-// no cap on the Set, single-select on the regular Ricotta item which this
-// transform doesn't touch).
+// The Ice Cream item is consulted only for Customize-mode plumbing:
+// `cannoliFillings` carries both Ricotta and Ice Cream branches, and each
+// SetOption gets an optional `iceCream` variation ref. Missing Ice Cream
+// data degrades Customize → Ice Cream gracefully (sizes without a matching
+// Ice Cream variation are flagged out-of-stock for that filling) but never
+// blocks the set composite from emitting.
 function buildSetComposite(
-  setItem: SnapshotItem,
+  iceCream: SnapshotItem,
+  ricotta: SnapshotItem,
   options: {
     setCompositeId: string;
     setCompositeName: string;
-    setFillingTypeListName: string;
-    setRicottaOptionName: string;
-    setIceCreamOptionName: string;
-    ricottaOnlyListSuffixes: ReadonlyArray<string>;
-    iceCreamOnlyListSuffixes: ReadonlyArray<string>;
-    setDefaults: {
-      ricottaFillingListSuffix: string;
-      ricottaFillingOptionName: string;
-      shellListSuffix: string;
-      shellOptionName: string;
-      garnishListSuffix: string;
-      garnishOptionName: string;
-    };
+    setAutoModifiers: ReadonlyArray<{
+      listNameSuffix: string;
+      modifierName: string;
+    }>;
+    setOptionSpecs: ReadonlyArray<{
+      key: string;
+      label: string;
+      variationPrefix: string;
+      qty: number;
+    }>;
+    kitModifierListName: string;
+    multipleBoxesModifierListName: string;
+    specialNotesListNameSuffix: string;
   },
 ): SnapshotItem | null {
-  const fillingTypeList = setItem.modifierLists.find(
-    (ml) =>
-      ml.modifierType === "list" && ml.name === options.setFillingTypeListName,
-  );
-  if (!fillingTypeList) {
-    console.warn(
-      `[cannoli-set] Filling-type list "${options.setFillingTypeListName}" not found on Set item — skipping set composite.`,
-    );
-    return null;
-  }
-  const norm = (s: string) => s.toLowerCase().trim();
-  const ricottaModifier = fillingTypeList.modifiers.find(
-    (m) => norm(m.name) === norm(options.setRicottaOptionName),
-  );
-  const iceCreamModifier = fillingTypeList.modifiers.find(
-    (m) => norm(m.name) === norm(options.setIceCreamOptionName),
-  );
-  if (!ricottaModifier || !iceCreamModifier) {
-    console.warn(
-      `[cannoli-set] Filling-type options "${options.setRicottaOptionName}" / "${options.setIceCreamOptionName}" not both present in "${fillingTypeList.name}" — skipping set composite.`,
-    );
-    return null;
-  }
-
-  // Apply the multi-select override on the ricotta filling list when present
-  // (the list-name suffix matches "filling" on the ricotta side). Per-set
-  // configuration only — the regular Cannoli composite reads its own
-  // attachment of the same list and stays single-select.
-  const overriddenLists = setItem.modifierLists.map((ml) => {
-    const lcName = norm(ml.name);
-    if (
-      ml.modifierType === "list" &&
-      lcName.endsWith(options.setDefaults.ricottaFillingListSuffix) &&
-      !lcName.includes("set filling") // don't override the filling-type list
-    ) {
-      return { ...ml, selectionType: "MULTIPLE" as const, maxSelected: null };
-    }
-    return ml;
-  });
-
-  const ricottaOnlyListIds: string[] = [];
-  const iceCreamOnlyListIds: string[] = [];
-  for (const ml of overriddenLists) {
-    const lcName = norm(ml.name);
-    // The filling-type list itself is universal — drives the conditional
-    // logic, never hides itself.
-    if (ml.id === fillingTypeList.id) continue;
-    if (options.ricottaOnlyListSuffixes.some((s) => lcName.endsWith(s))) {
-      ricottaOnlyListIds.push(ml.id);
-      continue;
-    }
-    if (options.iceCreamOnlyListSuffixes.some((s) => lcName.endsWith(s))) {
-      iceCreamOnlyListIds.push(ml.id);
-    }
-  }
-
-  // Default selections: filling type = Ricotta, plus Original / Chocolate /
-  // Mixed Garnish on the matching ricotta lists. Each lookup degrades
-  // independently — a missing default just isn't pre-filled.
-  const defaultSelections: Array<{ listId: string; modifierIds: string[] }> = [
-    { listId: fillingTypeList.id, modifierIds: [ricottaModifier.id] },
-  ];
-  const defaultLookups: Array<{ suffix: string; option: string }> = [
-    {
-      suffix: options.setDefaults.ricottaFillingListSuffix,
-      option: options.setDefaults.ricottaFillingOptionName,
-    },
-    {
-      suffix: options.setDefaults.shellListSuffix,
-      option: options.setDefaults.shellOptionName,
-    },
-    {
-      suffix: options.setDefaults.garnishListSuffix,
-      option: options.setDefaults.garnishOptionName,
-    },
-  ];
-  for (const { suffix, option } of defaultLookups) {
-    const list = overriddenLists.find(
+  const autoModifiers: AutoModifierRef[] = [];
+  for (const spec of options.setAutoModifiers) {
+    const list = ricotta.modifierLists.find(
       (ml) =>
         ml.modifierType === "list" &&
-        ml.id !== fillingTypeList.id &&
-        norm(ml.name).endsWith(suffix),
+        ml.name.toLowerCase().trim().endsWith(spec.listNameSuffix),
     );
-    const modifier = list?.modifiers.find(
-      (m) => norm(m.name) === norm(option),
-    );
-    if (list && modifier) {
-      defaultSelections.push({
-        listId: list.id,
-        modifierIds: [modifier.id],
-      });
-    } else {
+    if (!list) {
       console.warn(
-        `[cannoli-set] Default "${option}" in list ending "${suffix}" not resolvable; skipping that pre-selection.`,
+        `[cannoli-set] Modifier list with suffix "${spec.listNameSuffix}" not found on Ricotta — skipping set composite.`,
       );
+      return null;
     }
+    const modifier = list.modifiers.find(
+      (m) => m.name.toLowerCase().trim() === spec.modifierName.toLowerCase().trim(),
+    );
+    if (!modifier) {
+      console.warn(
+        `[cannoli-set] Modifier "${spec.modifierName}" not found in "${list.name}" — skipping set composite.`,
+      );
+      return null;
+    }
+    autoModifiers.push({
+      modifierListId: list.id,
+      modifierId: modifier.id,
+      ...(modifier.soldOut ? { soldOut: true } : {}),
+    });
   }
 
-  const set: SetInfo = {
-    fillingTypeListId: fillingTypeList.id,
-    ricottaModifierId: ricottaModifier.id,
-    iceCreamModifierId: iceCreamModifier.id,
-    ricottaOnlyListIds,
-    iceCreamOnlyListIds,
-    defaultSelections,
-  };
+  const setOptions: SetOption[] = [];
+  for (const spec of options.setOptionSpecs) {
+    const variation = ricotta.variations.find((v) =>
+      v.name.toLowerCase().trim().startsWith(spec.variationPrefix),
+    );
+    if (!variation) {
+      console.warn(
+        `[cannoli-set] Variation with prefix "${spec.variationPrefix}" not found on Ricotta — skipping set composite.`,
+      );
+      return null;
+    }
+    // Ice Cream equivalent — optional. Customize → Ice Cream uses this when
+    // present; absent means the size is unavailable on Ice Cream.
+    const iceCreamVariation = iceCream.variations.find((v) =>
+      v.name.toLowerCase().trim().startsWith(spec.variationPrefix),
+    );
+    setOptions.push({
+      key: spec.key,
+      label: spec.label,
+      variationId: variation.id,
+      qty: spec.qty,
+      priceCents: variation.priceCents,
+      inStock: variation.inStock,
+      ...(iceCreamVariation
+        ? {
+            iceCream: {
+              variationId: iceCreamVariation.id,
+              priceCents: iceCreamVariation.priceCents,
+              inStock: iceCreamVariation.inStock,
+            },
+          }
+        : {}),
+    });
+  }
+
+  const specialNotesList = ricotta.modifierLists.find(
+    (ml) =>
+      ml.modifierType === "text" &&
+      ml.name.toLowerCase().trim().endsWith(options.specialNotesListNameSuffix),
+  );
+  if (!specialNotesList) {
+    console.warn(
+      `[cannoli-set] Special Notes list with suffix "${options.specialNotesListNameSuffix}" not found on Ricotta — skipping set composite.`,
+    );
+    return null;
+  }
+
+  // Multiple Boxes lives on the Set composite (and only there) — set buyers
+  // commonly want each guest to walk away with their own box. Pulled from
+  // Ricotta because both filling items carry the same shared list. Absent =
+  // skip; the set otherwise renders fine, just without the option.
+  const multipleBoxesList = ricotta.modifierLists.find(
+    (ml) => ml.name === options.multipleBoxesModifierListName,
+  );
+
+  // Build per-filling modifier lists for Customize mode. Strip:
+  //   - "Cannoli Multiple Boxes" — a set is one packaged unit.
+  //   - "Cannoli Kit" — vestigial modifier reserved for the Kit composite.
+  //   - any TEXT (Special Notes) list — the top-level Set Special Notes
+  //     list already covers it; rendering it twice would confuse the user.
+  // Mixed Garnish is intentionally NOT stripped here — it's the only
+  // surface where customers can pick that option.
+  const stripBoxesKitAndText = (lists: SnapshotModifierList[]) =>
+    lists.filter(
+      (ml) =>
+        ml.name !== options.multipleBoxesModifierListName &&
+        ml.name !== options.kitModifierListName &&
+        ml.modifierType !== "text",
+    );
+
+  const cannoliFillings: CannoliFilling[] = [
+    {
+      key: "ice_cream",
+      label: "Ice Cream",
+      squareItemId: iceCream.id,
+      variations: iceCream.variations,
+      modifierLists: stripBoxesKitAndText(iceCream.modifierLists),
+    },
+    {
+      key: "ricotta",
+      label: "Ricotta",
+      squareItemId: ricotta.id,
+      variations: ricotta.variations,
+      modifierLists: stripBoxesKitAndText(ricotta.modifierLists),
+    },
+  ];
+
+  const set: SetInfo = { options: setOptions, autoModifiers };
 
   return {
     id: options.setCompositeId,
     name: options.setCompositeName,
-    description: setItem.description,
-    categoryName: setItem.categoryName,
-    variations: setItem.variations,
-    modifierLists: overriddenLists,
+    description: undefined,
+    categoryName: ricotta.categoryName,
+    variations: [],
+    modifierLists: multipleBoxesList
+      ? [multipleBoxesList, specialNotesList]
+      : [specialNotesList],
+    cannoliFillings,
     set,
   };
 }

@@ -73,9 +73,6 @@ function applyLocationSoldOut(
 // own modifier lists (Square modifier lists don't scope to specific
 // variations). The frontend re-merges them into composite "Cannoli" and
 // "Cannoli Kit" items with a filling-type picker — see mergeCannoliItems.
-// The "Cannoli Set" composite is a passthrough of a third Square item
-// ("Cannoli Online - Set") whose filling-type chooser lives in a real
-// Square modifier list ("Cannoli Set Filling": Ricotta / Ice Cream).
 //
 // The Square Cannoli category also contains legacy items ("Cannoli",
 // "Cannoli Kit (Per 6)", etc.) that aren't part of the online flow. Items in
@@ -84,11 +81,9 @@ function applyLocationSoldOut(
 const CANNOLI_CATEGORY_NAME = "Cannoli";
 const CANNOLI_ICE_CREAM_NAME = "Cannoli Online - Ice Cream";
 const CANNOLI_RICOTTA_NAME = "Cannoli Online - Ricotta";
-const CANNOLI_ONLINE_SET_NAME = "Cannoli Online - Set";
 const CANNOLI_ALLOWED_NAMES = new Set<string>([
   CANNOLI_ICE_CREAM_NAME,
   CANNOLI_RICOTTA_NAME,
-  CANNOLI_ONLINE_SET_NAME,
 ]);
 const CANNOLI_COMPOSITE_NAME = "Cannoli";
 const CANNOLI_COMPOSITE_ID = "cannoli__composite";
@@ -102,40 +97,34 @@ const MULTIPLE_BOXES_MODIFIER_LIST_NAME = "Cannoli Multiple Boxes";
 const KIT_GROUP_SIZE = 6;
 const PER_KIT_FEE_CENTS = 200;
 
-// Cannoli Set composite — backed directly by the "Cannoli Online - Set" item
-// in Square. Variations are real (the four set sizes); the filling-type
-// chooser is a real modifier list ("Cannoli Set Filling": Ricotta / Ice
-// Cream). Suffix matching on list names mirrors modifierListRank in
-// OrderFlow so Square renames at the prefix end keep working.
+// Cannoli Set composite — fixed-recipe Ricotta build (Ricotta + Chocolate +
+// Mixed) sold in three sizes. Auto modifiers are looked up by name from the
+// Ricotta item's modifier lists at catalog-build time. Suffix matching on
+// list names survives Square renames the same way modifierListRank does.
 const SET_COMPOSITE_NAME = "Cannoli Set";
 const SET_COMPOSITE_ID = "cannoli-set__composite";
-const SET_FILLING_TYPE_LIST_NAME = "Cannoli Set Filling";
-const SET_RICOTTA_OPTION_NAME = "Ricotta";
-const SET_ICE_CREAM_OPTION_NAME = "Ice Cream";
-// Modifier list-name suffixes that should only render when the user picks
-// Ricotta in the filling-type list. Lists matching neither bucket (Multiple
-// Boxes, Special Notes) render unconditionally.
-const SET_RICOTTA_ONLY_LIST_SUFFIXES = ["shell", "filling", "garnish"] as const;
-const SET_ICE_CREAM_ONLY_LIST_SUFFIXES = ["ice cream flavor"] as const;
-// Default-recipe options pre-filled when a Set line is added. Same recipe
-// as the legacy "Default" toggle — Ricotta filling type, Original ricotta
-// flavor, Chocolate shell, Mixed Garnish.
-const SET_DEFAULTS = {
-  ricottaFillingListSuffix: "filling",
-  ricottaFillingOptionName: "Original",
-  shellListSuffix: "shell",
-  shellOptionName: "Chocolate",
-  garnishListSuffix: "garnish",
-  garnishOptionName: "Mixed Garnish",
-} as const;
+// Auto-applied modifier OPTIONS, looked up by name from the Ricotta item's
+// modifier lists. The Filling list ("Cannoli Ricotta Filling") picks the
+// ricotta *flavor* — set lines default to "Original" plain ricotta. Shell
+// and Garnish are also fixed.
+const SET_AUTO_MODIFIERS = [
+  { listNameSuffix: "filling", modifierName: "Original" },
+  { listNameSuffix: "shell", modifierName: "Chocolate" },
+  { listNameSuffix: "garnish", modifierName: "Mixed Garnish" },
+] as const;
+const SET_OPTION_SPECS = [
+  { key: "6_full", label: "6 Full Size", variationPrefix: "full", qty: 6 },
+  { key: "12_full", label: "12 Full Size", variationPrefix: "full", qty: 12 },
+  { key: "12_mini", label: "12 Mini Size", variationPrefix: "mini", qty: 12 },
+  { key: "24_mini", label: "24 Mini Size", variationPrefix: "mini", qty: 24 },
+] as const;
 // Modifier OPTION names that exist in Square but should NOT surface as user-
 // pickable choices on the regular Cannoli or Cannoli Kit composites — they
-// are reserved for the Set composite (Mixed Garnish is the default garnish
-// recipe; Mixed Shell is set-only at the user's request).
+// are reserved for set-only auto-application.
 const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
   "Mixed Garnish",
-  "Mixed Shell",
 ]);
+const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
 // Modifier OPTION names that exist in Square but should NEVER surface in the
 // online ordering UI, regardless of which item or list they appear on.
@@ -224,7 +213,6 @@ export async function getCatalog(): Promise<{ items: SnapshotItem[] }> {
   const mergedItems = mergeCannoliItems(cleanedItems, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,
     ricottaItemName: CANNOLI_RICOTTA_NAME,
-    setItemName: CANNOLI_ONLINE_SET_NAME,
     compositeName: CANNOLI_COMPOSITE_NAME,
     compositeId: CANNOLI_COMPOSITE_ID,
     kitCompositeName: KIT_COMPOSITE_NAME,
@@ -235,13 +223,10 @@ export async function getCatalog(): Promise<{ items: SnapshotItem[] }> {
     perKitFeeCents: PER_KIT_FEE_CENTS,
     setCompositeName: SET_COMPOSITE_NAME,
     setCompositeId: SET_COMPOSITE_ID,
-    setFillingTypeListName: SET_FILLING_TYPE_LIST_NAME,
-    setRicottaOptionName: SET_RICOTTA_OPTION_NAME,
-    setIceCreamOptionName: SET_ICE_CREAM_OPTION_NAME,
-    ricottaOnlyListSuffixes: SET_RICOTTA_ONLY_LIST_SUFFIXES,
-    iceCreamOnlyListSuffixes: SET_ICE_CREAM_ONLY_LIST_SUFFIXES,
-    setDefaults: SET_DEFAULTS,
+    setAutoModifiers: SET_AUTO_MODIFIERS,
+    setOptionSpecs: SET_OPTION_SPECS,
     setReservedModifierNames: SET_RESERVED_MODIFIER_NAMES,
+    specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });
 
   return { items: mergedItems };

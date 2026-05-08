@@ -10,11 +10,9 @@ import type { SnapshotItem } from "../src/lib/square/types";
 const CANNOLI_CATEGORY_NAME = "Cannoli";
 const CANNOLI_ICE_CREAM_NAME = "Cannoli Online - Ice Cream";
 const CANNOLI_RICOTTA_NAME = "Cannoli Online - Ricotta";
-const CANNOLI_ONLINE_SET_NAME = "Cannoli Online - Set";
 const CANNOLI_ALLOWED_NAMES = new Set<string>([
   CANNOLI_ICE_CREAM_NAME,
   CANNOLI_RICOTTA_NAME,
-  CANNOLI_ONLINE_SET_NAME,
 ]);
 const CANNOLI_COMPOSITE_NAME = "Cannoli";
 const CANNOLI_COMPOSITE_ID = "cannoli__composite";
@@ -26,23 +24,21 @@ const KIT_GROUP_SIZE = 6;
 const PER_KIT_FEE_CENTS = 200;
 const SET_COMPOSITE_NAME = "Cannoli Set";
 const SET_COMPOSITE_ID = "cannoli-set__composite";
-const SET_FILLING_TYPE_LIST_NAME = "Cannoli Set Filling";
-const SET_RICOTTA_OPTION_NAME = "Ricotta";
-const SET_ICE_CREAM_OPTION_NAME = "Ice Cream";
-const SET_RICOTTA_ONLY_LIST_SUFFIXES = ["shell", "filling", "garnish"] as const;
-const SET_ICE_CREAM_ONLY_LIST_SUFFIXES = ["ice cream flavor"] as const;
-const SET_DEFAULTS = {
-  ricottaFillingListSuffix: "filling",
-  ricottaFillingOptionName: "Original",
-  shellListSuffix: "shell",
-  shellOptionName: "Chocolate",
-  garnishListSuffix: "garnish",
-  garnishOptionName: "Mixed Garnish",
-} as const;
+const SET_AUTO_MODIFIERS = [
+  { listNameSuffix: "filling", modifierName: "Original" },
+  { listNameSuffix: "shell", modifierName: "Chocolate" },
+  { listNameSuffix: "garnish", modifierName: "Mixed Garnish" },
+] as const;
+const SET_OPTION_SPECS = [
+  { key: "6_full", label: "6 Full Size", variationPrefix: "full", qty: 6 },
+  { key: "12_full", label: "12 Full Size", variationPrefix: "full", qty: 12 },
+  { key: "12_mini", label: "12 Mini", variationPrefix: "mini", qty: 12 },
+  { key: "24_mini", label: "24 Mini", variationPrefix: "mini", qty: 24 },
+] as const;
 const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
   "Mixed Garnish",
-  "Mixed Shell",
 ]);
+const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
 async function main() {
   const token = process.env.SQUARE_ACCESS_TOKEN!;
@@ -119,7 +115,6 @@ async function main() {
   const merged = mergeCannoliItems(items, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,
     ricottaItemName: CANNOLI_RICOTTA_NAME,
-    setItemName: CANNOLI_ONLINE_SET_NAME,
     compositeName: CANNOLI_COMPOSITE_NAME,
     compositeId: CANNOLI_COMPOSITE_ID,
     kitCompositeName: KIT_COMPOSITE_NAME,
@@ -130,13 +125,10 @@ async function main() {
     perKitFeeCents: PER_KIT_FEE_CENTS,
     setCompositeName: SET_COMPOSITE_NAME,
     setCompositeId: SET_COMPOSITE_ID,
-    setFillingTypeListName: SET_FILLING_TYPE_LIST_NAME,
-    setRicottaOptionName: SET_RICOTTA_OPTION_NAME,
-    setIceCreamOptionName: SET_ICE_CREAM_OPTION_NAME,
-    ricottaOnlyListSuffixes: SET_RICOTTA_ONLY_LIST_SUFFIXES,
-    iceCreamOnlyListSuffixes: SET_ICE_CREAM_ONLY_LIST_SUFFIXES,
-    setDefaults: SET_DEFAULTS,
+    setAutoModifiers: SET_AUTO_MODIFIERS,
+    setOptionSpecs: SET_OPTION_SPECS,
     setReservedModifierNames: SET_RESERVED_MODIFIER_NAMES,
+    specialNotesListNameSuffix: SPECIAL_NOTES_LIST_NAME_SUFFIX,
   });
 
   console.log(`\n== After merge: ${merged.length} items ==\n`);
@@ -160,19 +152,10 @@ async function main() {
       }
     } else if (i.set) {
       console.log(
-        `    set variations: ${i.variations.map((v) => `${v.name} ($${(v.priceCents / 100).toFixed(2)})`).join(", ")}`
+        `    set options: ${i.set.options.map((o) => `${o.label} → ${o.variationId} × ${o.qty} (inStock=${o.inStock})`).join(" | ")}`
       );
       console.log(
-        `    filling-type list: ${i.set.fillingTypeListId} (ricotta=${i.set.ricottaModifierId}, ice_cream=${i.set.iceCreamModifierId})`
-      );
-      console.log(
-        `    ricotta-only lists: ${i.set.ricottaOnlyListIds.join(", ") || "(none)"}`
-      );
-      console.log(
-        `    ice-cream-only lists: ${i.set.iceCreamOnlyListIds.join(", ") || "(none)"}`
-      );
-      console.log(
-        `    default selections: ${i.set.defaultSelections.map((d) => `${d.listId}=${d.modifierIds.join("/")}`).join(", ")}`
+        `    auto modifiers: ${i.set.autoModifiers.map((am) => `${am.modifierListId}=${am.modifierId}${am.soldOut ? " SOLD OUT" : ""}`).join(", ")}`
       );
       console.log(
         `    modifier lists: ${i.modifierLists.map((m) => m.name).join(", ") || "(none)"}`

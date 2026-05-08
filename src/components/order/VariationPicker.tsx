@@ -10,7 +10,6 @@ export function VariationPicker({
   selectedId,
   onSelect,
   hidePrice,
-  label = "Size",
 }: {
   variations: SnapshotVariation[];
   selectedId: string | null;
@@ -19,9 +18,6 @@ export function VariationPicker({
   // pricing (Cannoli) where a single chip price is misleading; the caller
   // renders a separate tier breakdown alongside the picker.
   hidePrice?: boolean;
-  // Override the section heading label. Defaults to "Size"; the Set
-  // composite uses "Set Size" to match the legacy chip-picker copy.
-  label?: string;
 }) {
   if (variations.length === 0) return null;
   const picked = variations.find((v) => v.id === selectedId);
@@ -30,7 +26,7 @@ export function VariationPicker({
 
   return (
     <div className="mb-4">
-      <SectionHeading label={label} state={state} />
+      <SectionHeading label="Size" state={state} />
       <div className="flex flex-wrap gap-2">
         {variations.map((v) => {
           const sel = v.id === selectedId;
