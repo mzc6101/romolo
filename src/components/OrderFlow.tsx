@@ -1892,7 +1892,7 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
       <p className="text-romolo-warm-gray mb-5">
         Order{" "}
         <strong className="text-romolo-charcoal">{order.confirmation}</strong> is in. We&apos;ll email{" "}
-        {order.contact.email || "you"} when it&apos;s ready to pick up.
+        {order.contact.email || "you"}{" "}when it&apos;s ready to pick up.
       </p>
       <div className="bg-romolo-cream border border-romolo-border rounded-sm p-4 text-left mb-5">
         <div className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
