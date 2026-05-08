@@ -132,14 +132,17 @@ function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
 
 // Modifier lists render in catalog order by default, which doesn't always
 // match the desired UX. Rank them here so:
+//   set filling (Cannoli Set filling-type chooser — Ricotta vs Ice Cream)
 //   shell → filling → garnish (Ricotta structural choices, in that order)
 //   <other lists, in catalog order>     (e.g. Ice Cream Flavor)
 //   multiple boxes → special notes      (always last — packing + notes)
 // Suffix match so Square renames like "Cannoli Ricotta Shell" / "Cannoli
-// Multiple Boxes" still rank correctly. Non-matching lists keep their
-// relative order via JavaScript's stable sort.
+// Multiple Boxes" still rank correctly. "set filling" check runs before
+// "filling" so the Set's filling-type list outranks the Ricotta Filling
+// list. Non-matching lists keep their relative order via JS stable sort.
 const modifierListRank = (name: string): number => {
   const lc = name.toLowerCase().trim();
+  if (lc.endsWith("set filling")) return -4;
   if (lc.endsWith("shell")) return -3;
   if (lc.endsWith("filling")) return -2;
   if (lc.endsWith("garnish")) return -1;
@@ -1375,8 +1378,12 @@ function OrderLineEditor({
         // for the currently picked size as a small italic note below.
         // Tier values mirror the AUTOMATIC pricing rules in Square; if
         // those change, update them here too.
+        // Set composite hides chip prices too — the line total below the
+        // header already shows the picked size's price, and the size chips
+        // read cleaner without per-chip pricing repeated four times.
         const isCannoli =
           !!item.cannoliFillings && !item.kit && !item.set;
+        const isSet = !!item.set;
         const picked = variations.find((v) => v.id === line.variationId);
         const tierNote = (() => {
           if (!isCannoli || !picked) return null;
@@ -1394,8 +1401,8 @@ function OrderLineEditor({
               variations={variations}
               selectedId={line.variationId}
               onSelect={(id) => onChange({ variationId: id })}
-              hidePrice={isCannoli}
-              label={item.set ? "Set Size" : "Size"}
+              hidePrice={isCannoli || isSet}
+              label={isSet ? "Set Size" : "Size"}
             />
             {tierNote && (
               <div className="-mt-2 mb-4 text-[12px] italic text-romolo-warm-gray">
