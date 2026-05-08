@@ -46,6 +46,7 @@ export function buildOrderLineItems(
 }
 
 export function buildOrderPayload(req: OrderRequest, locationId: string) {
+  const note = req.note?.trim();
   return {
     idempotencyKey: req.idempotencyKey,
     order: {
@@ -57,6 +58,10 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
       pricingOptions: {
         autoApplyDiscounts: true,
       },
+      // Square's order-level note. Renders in the dashboard order header and
+      // on the kitchen ticket. Omitted when blank so empty notes don't clutter
+      // the dashboard with an empty header line.
+      ...(note ? { note } : {}),
       lineItems: buildOrderLineItems(req.lines),
       fulfillments: [
         {

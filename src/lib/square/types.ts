@@ -154,6 +154,10 @@ export type OrderRequest = {
   sourceId: string;
   pickupAt: string;
   contact: { name: string; phone: string; email: string };
+  // Order-level customer note (entered on the Review step). Threads through
+  // to Square as order.note — the kitchen ticket header. Per-line freeText
+  // notes still attach to their respective line items separately.
+  note?: string;
   lines: Array<{
     catalogObjectId: string;
     quantity: number;

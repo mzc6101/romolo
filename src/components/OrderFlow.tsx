@@ -162,6 +162,9 @@ type Order = {
   lines: OrderLine[];
   fulfillment: "pickup";
   contact: Contact;
+  // Order-level note entered on the Review step. Sent to Square as
+  // order.note (top-level, separate from per-line freeText/notes).
+  note: string;
   confirmation: string;
 };
 
@@ -244,6 +247,7 @@ const initialOrder = (): Order => ({
   lines: [],
   fulfillment: "pickup",
   contact: { name: "", phone: "", email: "" },
+  note: "",
   confirmation: "",
 });
 
@@ -445,6 +449,7 @@ export default function OrderFlow() {
         pickupAt,
         contact: order.contact,
         lines: order.lines.map((l) => buildLinePayload(l, snapshot)),
+        ...(order.note.trim() ? { note: order.note.trim() } : {}),
       }),
     });
 
@@ -1638,9 +1643,33 @@ function StepReview({
           })}
         </div>
       )}
+
+      {order.lines.length > 0 && (
+        <div className="mt-5">
+          <SectionHeading label="Special Notes" state="optional" />
+          <textarea
+            value={order.note}
+            onChange={(e) =>
+              setOrder({ ...order, note: e.target.value.slice(0, ORDER_NOTE_MAX) })
+            }
+            maxLength={ORDER_NOTE_MAX}
+            rows={3}
+            className="w-full px-3 py-2 bg-white border border-romolo-border rounded-sm text-sm text-romolo-charcoal focus:outline-none focus:border-romolo-red/40 resize-none"
+            placeholder="Anything the kitchen should know about the whole order…"
+          />
+          <div className="mt-1 text-[10px] text-romolo-warm-gray text-right">
+            {order.note.length}/{ORDER_NOTE_MAX}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// Mirrors the cap on /api/orders bodySchema and Square's order.note limit.
+// 500 chars matches per-line note caps so the kitchen ticket length stays
+// consistent across both places notes can be entered.
+const ORDER_NOTE_MAX = 500;
 
 // One-line description of a configured line for read-only display. Resolves
 // modifier ids → modifier names against the same active-list logic the

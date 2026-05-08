@@ -29,6 +29,9 @@ const bodySchema = z.object({
     phone: z.string().min(1).max(40),
     email: z.string().email(),
   }),
+  // Order-level customer note. Square's order.note caps at 500 chars; we
+  // mirror that here so the client and Square agree on the upper bound.
+  note: z.string().max(500).optional(),
   lines: z.array(lineSchema).min(1),
 });
 
