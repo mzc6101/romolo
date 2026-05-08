@@ -1306,6 +1306,11 @@ function OrderLineEditor({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {lineTotalCents != null && (
+            <span className="text-[14px] font-semibold tabular-nums text-romolo-charcoal">
+              {fmtCents(lineTotalCents)}
+            </span>
+          )}
           {/* Set lines have a fixed qty per size option (6/12/24); the size
               chip picker below carries the qty selection, so the stepper
               would be misleading. */}
@@ -1318,11 +1323,6 @@ function OrderLineEditor({
                 onChange({ qty: item.kit ? v * item.kit.groupSize : v })
               }
             />
-          )}
-          {lineTotalCents != null && (
-            <span className="text-[14px] font-semibold tabular-nums text-romolo-charcoal">
-              {fmtCents(lineTotalCents)}
-            </span>
           )}
           {onRemove && (
             <button
