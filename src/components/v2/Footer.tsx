@@ -102,7 +102,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="mt-14 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/30">
-            &copy; {new Date().getFullYear()} Romolo&apos;s Cannoli. All rights reserved.
+            {`© ${new Date().getFullYear()} Romolo's Cannoli. All rights reserved.`}
           </p>
           <div className="flex flex-col items-center sm:items-end gap-3">
             <div className="flex gap-6 text-xs text-white/30">
