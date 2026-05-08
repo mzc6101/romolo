@@ -58,10 +58,6 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
       pricingOptions: {
         autoApplyDiscounts: true,
       },
-      // Square's order-level note. Renders in the dashboard order header and
-      // on the kitchen ticket. Omitted when blank so empty notes don't clutter
-      // the dashboard with an empty header line.
-      ...(note ? { note } : {}),
       lineItems: buildOrderLineItems(req.lines),
       fulfillments: [
         {
@@ -74,6 +70,15 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
               emailAddress: req.contact.email,
               phoneNumber: req.contact.phone,
             },
+            // Pickup-level customer note. We tried `order.note` first, but
+            // the Square Node SDK's Fern-generated Order serializer doesn't
+            // declare `note` on its Raw schema and silently strips unknown
+            // fields, so the value never reaches Square. PickupDetails.note
+            // IS in the SDK schema (max 500 chars) and surfaces on the
+            // dashboard order detail and kitchen ticket as the pickup
+            // instruction note. Omitted when blank so an empty note doesn't
+            // clutter the dashboard.
+            ...(note ? { note } : {}),
           },
         },
       ],
