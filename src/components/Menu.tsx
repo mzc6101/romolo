@@ -1,13 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { MENU_DATA } from "@/lib/data";
+import { useState } from "react";
+import { MENU_DATA, type MenuItem } from "@/lib/data";
 import { useOrder } from "./OrderProvider";
+import { MenuGalleryModal } from "./MenuGalleryModal";
 
 export default function Menu() {
   const { open } = useOrder();
+  const [galleryItem, setGalleryItem] = useState<MenuItem | null>(null);
 
   return (
+    <>
     <section id="menu" className="py-24 md:py-36 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         {/* Section header */}
@@ -51,11 +55,18 @@ export default function Menu() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-5 md:gap-7">
                 {category.items.map((item) => (
                   <figure key={item.id} className="group">
-                    <div className="relative aspect-square rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border">
+                    <button
+                      type="button"
+                      onClick={() => setGalleryItem(item)}
+                      aria-haspopup="dialog"
+                      aria-expanded={galleryItem?.id === item.id}
+                      aria-label={`Open photo gallery for ${item.name}`}
+                      className="relative aspect-square w-full rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border p-0 cursor-pointer text-left shadow-none block focus:outline-none focus-visible:ring-2 focus-visible:ring-romolo-red/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    >
                       {item.imageUrl ? (
                         <Image
                           src={item.imageUrl}
-                          alt={item.name}
+                          alt=""
                           fill
                           className="object-cover transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-[1.05]"
                           sizes="(min-width: 1024px) 26vw, (min-width: 768px) 32vw, 48vw"
@@ -67,7 +78,7 @@ export default function Menu() {
                           </span>
                         </div>
                       )}
-                    </div>
+                    </button>
                     <figcaption className="pt-4">
                       <h4 className="font-[var(--font-serif)] text-lg md:text-xl font-medium text-romolo-charcoal m-0 leading-snug">
                         {item.name}
@@ -96,5 +107,7 @@ export default function Menu() {
         Start an Order
       </button>
     </section>
+    <MenuGalleryModal item={galleryItem} onClose={() => setGalleryItem(null)} />
+    </>
   );
 }
