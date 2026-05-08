@@ -439,7 +439,7 @@ describe("mergeCannoliItems", () => {
       { key: "12_mini", label: "12 Mini Size", variationPrefix: "mini", qty: 12 },
       { key: "24_mini", label: "24 Mini Size", variationPrefix: "mini", qty: 24 },
     ],
-    setReservedModifierNames: new Set<string>(["Mixed Garnish"]),
+    setReservedModifierNames: new Set<string>(["Mixed Garnish", "Mixed Shell"]),
     specialNotesListNameSuffix: "special notes",
   };
 
@@ -601,6 +601,7 @@ describe("mergeCannoliItems", () => {
     modifiers: [
       { id: "M_SHELL_PLAIN", name: "Plain", priceCents: 0 },
       { id: "M_SHELL_CHOC", name: "Chocolate", priceCents: 0 },
+      { id: "M_SHELL_MIXED", name: "Mixed Shell", priceCents: 0 },
     ],
   });
   const garnishListWithMixed = (): SnapshotModifierList => ({
@@ -848,6 +849,22 @@ describe("mergeCannoliItems", () => {
       ]);
     });
 
+    it("strips Mixed Shell from the regular Cannoli composite's Shell list", () => {
+      const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
+      const regular = result[0];
+      const ricBranch = regular.cannoliFillings!.find((f) => f.key === "ricotta")!;
+      const shell = ricBranch.modifierLists.find((ml) => ml.id === "ML_SHELL")!;
+      expect(shell.modifiers.map((m) => m.name)).toEqual(["Plain", "Chocolate"]);
+    });
+
+    it("strips Mixed Shell from the Cannoli Kit composite's Shell list", () => {
+      const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
+      const kit = result[1];
+      const ricBranch = kit.cannoliFillings!.find((f) => f.key === "ricotta")!;
+      const shell = ricBranch.modifierLists.find((ml) => ml.id === "ML_SHELL")!;
+      expect(shell.modifiers.map((m) => m.name)).toEqual(["Plain", "Chocolate"]);
+    });
+
     it("does not emit the set composite when the Mixed garnish modifier is missing", () => {
       const ricotta = setRicotta();
       const garnish = ricotta.modifierLists.find((ml) => ml.id === "ML_GARNISH")!;
@@ -953,6 +970,17 @@ describe("mergeCannoliItems", () => {
         const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
         const garnish = ric.modifierLists.find((m) => m.id === "ML_GARNISH")!;
         expect(garnish.modifiers.map((m) => m.name)).toContain("Mixed Garnish");
+      });
+
+      it("KEEPS Mixed Shell on the Set composite's Ricotta Shell list — set-only Customize option", () => {
+        const result = mergeCannoliItems(
+          [setIceCreamRich(), setRicotta()],
+          options,
+        );
+        const set = result[2];
+        const ric = set.cannoliFillings!.find((f) => f.key === "ricotta")!;
+        const shell = ric.modifierLists.find((m) => m.id === "ML_SHELL")!;
+        expect(shell.modifiers.map((m) => m.name)).toContain("Mixed Shell");
       });
 
       it("Set Ricotta side exposes Shell, Filling, Garnish lists", () => {

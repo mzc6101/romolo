@@ -120,9 +120,12 @@ const SET_OPTION_SPECS = [
 ] as const;
 // Modifier OPTION names that exist in Square but should NOT surface as user-
 // pickable choices on the regular Cannoli or Cannoli Kit composites — they
-// are reserved for set-only auto-application.
+// are reserved for the Set composite (Mixed Garnish is auto-applied in the
+// default Set recipe; Mixed Shell is selectable in Customize mode on the Set
+// only — neither belongs on a single-cannoli or kit line).
 const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
   "Mixed Garnish",
+  "Mixed Shell",
 ]);
 const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
