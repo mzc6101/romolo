@@ -101,6 +101,30 @@ export function MenuGalleryModal({ item, onClose }: MenuGalleryModalProps) {
               </figure>
             ))}
           </div>
+
+          {item.options && item.options.length > 0 ? (
+            <>
+              <div className="h-[1px] bg-romolo-border my-10 origin-left" />
+              <div className="flex items-center gap-6 mb-8">
+                <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60 shrink-0" />
+                <p className="text-base md:text-lg tracking-[0.3em] uppercase text-romolo-red font-medium m-0">
+                  Ordering Options
+                </p>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-7 max-w-3xl">
+                {item.options.map((group) => (
+                  <div key={group.label}>
+                    <dt className="font-[var(--font-serif)] text-[18px] md:text-[20px] font-medium text-romolo-charcoal leading-snug m-0">
+                      {group.label}
+                    </dt>
+                    <dd className="mt-2 text-[14px] md:text-[15px] text-romolo-warm-gray leading-relaxed m-0">
+                      {group.choices.join("  ·  ")}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

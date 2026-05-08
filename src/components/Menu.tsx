@@ -80,8 +80,16 @@ export default function Menu() {
                       )}
                     </button>
                     <figcaption className="pt-4">
-                      <h4 className="font-[var(--font-serif)] text-lg md:text-xl font-medium text-romolo-charcoal m-0 leading-snug">
-                        {item.name}
+                      <h4 className="font-[var(--font-serif)] text-lg md:text-xl font-medium m-0 leading-snug">
+                        <button
+                          type="button"
+                          onClick={() => setGalleryItem(item)}
+                          aria-haspopup="dialog"
+                          aria-expanded={galleryItem?.id === item.id}
+                          className="inline-block origin-left bg-transparent border-0 p-0 text-left text-romolo-charcoal underline-offset-[6px] decoration-romolo-red/70 cursor-pointer transition-all duration-200 ease-out hover:text-romolo-red hover:underline hover:scale-[1.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-romolo-red/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white rounded-sm"
+                        >
+                          {item.name}
+                        </button>
                       </h4>
                       {item.description && (
                         <p className="text-[13px] text-romolo-warm-gray mt-1.5 leading-relaxed m-0">

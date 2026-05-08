@@ -12,6 +12,13 @@
 /** Three images shown in the menu item lightbox gallery. */
 export type MenuGalleryUrls = readonly [string, string, string];
 
+/** A single read-only option group displayed in the gallery modal. The actual
+ * orderable choices live in Square — these mirror them for marketing copy. */
+export type MenuOptionGroup = {
+  label: string;
+  choices: readonly string[];
+};
+
 export type MenuItem = {
   id: string;
   name: string;
@@ -21,6 +28,8 @@ export type MenuItem = {
   imageUrl?: string;
   /** Full gallery for this item (lightbox). */
   galleryUrls: MenuGalleryUrls;
+  /** Read-only ordering options shown inside the gallery modal. */
+  options?: readonly MenuOptionGroup[];
 };
 
 export type MenuCategory = {
@@ -28,6 +37,45 @@ export type MenuCategory = {
   squareSyncedAt: string;
   items: MenuItem[];
 };
+
+// Shared by Cannoli — Full / Mini / Kit. All three composites carry the same
+// modifier surface in Square (ricotta filling/shell/garnish + ice cream
+// filling alternative); reusing one constant keeps copy in sync.
+const CANNOLI_OPTIONS: readonly MenuOptionGroup[] = [
+  {
+    label: "Ricotta filling",
+    choices: [
+      "Original",
+      "Chocolate",
+      "Tiramisu",
+      "Pistachio",
+      "Lemon Cello",
+      "Strawberry",
+    ],
+  },
+  { label: "Ricotta shell", choices: ["Chocolate", "Plain"] },
+  {
+    label: "Ricotta garnish",
+    choices: ["Pistachio", "Chocolate Chips", "Toffee", "Cherries"],
+  },
+  {
+    label: "Ice cream filling",
+    choices: ["Vanilla", "Chocolate", "Coffee", "Mint", "Strawberry"],
+  },
+] as const;
+
+// Shared by Ice Cream + Milkshake — both pull from Square's "Ice Cream
+// Flavors" modifier list.
+const ICE_CREAM_FLAVORS: readonly string[] = [
+  "Vanilla",
+  "Chocolate",
+  "Coffee",
+  "Mint Chip",
+  "Strawberry",
+  "Berry White",
+  "Unicorn",
+  "Spumoni",
+] as const;
 
 export const MENU_DATA: MenuCategory[] = [
   {
@@ -46,6 +94,7 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775678635/_N8Z0762_bsvral.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208102/_N8Z0653_yul3bg.jpg",
         ],
+        options: CANNOLI_OPTIONS,
       },
       {
         id: "cannoli-mini",
@@ -59,6 +108,7 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328556/_N8Z0787_acdfse.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208836/_N8Z0658_eqz1yw.jpg",
         ],
+        options: CANNOLI_OPTIONS,
       },
       {
         id: "cannoli-kit",
@@ -73,6 +123,7 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208180/_N8Z0841_ym5wta.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208645/_N8Z0577_obul7k.jpg",
         ],
+        options: CANNOLI_OPTIONS,
       },
     ],
   },
@@ -104,6 +155,12 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328740/_N8Z0782_lir3xp.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209133/_N8Z0952_wtpsj1.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209143/_N8Z0947_qejilj.jpg",
+        ],
+        options: [
+          {
+            label: "Flavor",
+            choices: ["Amaretti", "Rainbow", "Cucidati"],
+          },
         ],
       },
       {
@@ -144,6 +201,7 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209384/_N8Z0804_cmrtim.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209398/_N8Z0794-Edit_ghtqgl.jpg",
         ],
+        options: [{ label: "Size", choices: ["Small", "Large"] }],
       },
     ],
   },
@@ -163,6 +221,13 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209526/_N8Z0808_bqtskg.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209505/_N8Z0809_aqicfp.jpg",
         ],
+        options: [
+          {
+            label: "Size",
+            choices: ["Small", "Medium", "Pint", "Quart", "Half Gallon"],
+          },
+          { label: "Flavor", choices: ICE_CREAM_FLAVORS },
+        ],
       },
       {
         id: "milkshake",
@@ -174,6 +239,7 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328873/_N8Z0797-Edit_jvlpx4.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
         ],
+        options: [{ label: "Flavor", choices: ICE_CREAM_FLAVORS }],
       },
     ],
   },
