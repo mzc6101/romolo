@@ -13,7 +13,7 @@ const steps: Step[] = [
     number: "01",
     title: "The Dough",
     description:
-      "We start with a centuries-old recipe — flour, sugar, a touch of Marsala wine, and lard for that signature flakiness. The dough is kneaded by hand until it reaches the perfect elasticity.",
+      "Centuries-old recipe — flour, sugar, cocoa, salt and butter for that signature flakiness. Kneaded to the perfect elasticity.",
     image:
       "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679656/_N8Z0124_xmcrvy.jpg",
     imageAlt: "Hands kneading cannoli dough on a marble countertop",
@@ -22,7 +22,7 @@ const steps: Step[] = [
     number: "02",
     title: "The Shell",
     description:
-      "Each shell is rolled paper-thin, wrapped around traditional metal tubes, and fried in small batches until golden and blistered. We fry to order — a Romolo's shell always shatters.",
+      "Rolled out and wrapped around metal tubes, then fried in small batches until golden and bubbly.",
     image:
       "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679767/_N8Z0547_jzapgm.jpg",
     imageAlt: "Cannoli shells frying in golden oil",
@@ -31,7 +31,7 @@ const steps: Step[] = [
     number: "03",
     title: "The Filling",
     description:
-      "Fresh ricotta, strained overnight, folded with just enough sugar and a whisper of vanilla. No shortcuts, no stabilizers — only the real thing, made fresh each morning.",
+      "Fresh ricotta, strained overnight then folded with sugar and spice for the classic velvety texture.",
     image:
       "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679595/_N8Z0582_yktkoz.jpg",
     imageAlt: "Creamy ricotta filling being prepared in a copper bowl",
@@ -40,7 +40,7 @@ const steps: Step[] = [
     number: "04",
     title: "Yours, Filled to Order",
     description:
-      "We fill each cannolo when you order it, never before. Garnished with pistachio, candied orange, or chocolate.",
+      "Each cannolo filled to order and garnished beautifully for you and yours.",
     image:
       "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328121/_N8Z0971_afadsx.jpg",
     imageAlt: "Aaron handing a cannolo to a customer at the counter",
