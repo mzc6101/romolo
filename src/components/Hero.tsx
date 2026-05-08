@@ -26,10 +26,15 @@ export default function Hero() {
           Authentic Sicilian Treats Since 1968
         </p>
 
-        <h1 className="font-[var(--font-serif)] text-6xl md:text-8xl lg:text-9xl font-light text-white leading-[0.9] mb-6">
-          Romolo&apos;s
-          <br />
-          <span className="italic font-light">Cannoli</span>
+        <h1 className="mb-6 mx-auto w-full max-w-sm md:max-w-md lg:max-w-2xl">
+          <Image
+            src="/RmLogoWhite.png"
+            alt="Romolo's Cannoli"
+            width={926}
+            height={503}
+            priority
+            className="h-auto w-full object-contain"
+          />
         </h1>
 
         <p className="font-[var(--font-serif)] text-lg md:text-xl text-white/80 font-light italic max-w-lg mx-auto mb-10">
