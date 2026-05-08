@@ -1,8 +1,20 @@
 "use client";
 
 import type { SnapshotModifierList } from "@/lib/square/types";
+import { SectionHeading } from "./SectionHeading";
 
 const fmt = (cents: number) => "$" + (cents / 100).toFixed(2);
+
+// Display-only label cleanup. The "Cannoli " prefix on Square's
+// "Cannoli Multiple Boxes" list reads chunky in uppercase tracked caps and
+// is redundant under a Cannoli-related item. Kitchen-ticket notes still
+// emit the raw Square name elsewhere.
+function displayListName(name: string): string {
+  if (name.toLowerCase().trim().endsWith("multiple boxes")) {
+    return "Multiple Boxes";
+  }
+  return name;
+}
 
 export function ModifierSet({
   list,
@@ -19,14 +31,15 @@ export function ModifierSet({
 }) {
   if (list.modifierType === "text") {
     const required = list.minSelected > 0;
+    const filled = (text ?? "").trim().length > 0;
+    const state: "required" | "satisfied" | "optional" = required
+      ? filled
+        ? "satisfied"
+        : "required"
+      : "optional";
     return (
       <div className="mb-4">
-        <h5 className="flex items-center gap-2 text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-          {list.name}
-          <span className="font-semibold normal-case tracking-normal text-romolo-red">
-            · {required ? "Required" : "Optional"}
-          </span>
-        </h5>
+        <SectionHeading label={displayListName(list.name)} state={state} />
         <textarea
           value={text ?? ""}
           onChange={(e) => onTextChange?.(e.target.value)}
@@ -67,24 +80,21 @@ export function ModifierSet({
   };
 
   const required = list.minSelected > 0;
-  const helper = isSingle
-    ? required
-      ? "Choose one"
-      : "Optional"
-    : list.maxSelected != null
-    ? `Up to ${list.maxSelected}`
-    : required
-    ? `At least ${list.minSelected}`
-    : "Optional";
+  // A required pick is satisfied when the user has met minSelected and none
+  // of the chosen modifiers have flipped to sold-out since selection.
+  const enoughPicked = selectedIds.length >= Math.max(1, list.minSelected);
+  const anySoldOut = selectedIds.some(
+    (id) => list.modifiers.find((m) => m.id === id)?.soldOut === true,
+  );
+  const state: "required" | "satisfied" | "optional" = required
+    ? enoughPicked && !anySoldOut
+      ? "satisfied"
+      : "required"
+    : "optional";
 
   return (
     <div className="mb-4">
-      <h5 className="flex items-center gap-2 text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-        {list.name}
-        <span className="font-semibold normal-case tracking-normal text-romolo-red">
-          · {helper}
-        </span>
-      </h5>
+      <SectionHeading label={displayListName(list.name)} state={state} />
       <div className="flex flex-wrap gap-2">
         {list.modifiers.map((m) => {
           const sel = selectedIds.includes(m.id);

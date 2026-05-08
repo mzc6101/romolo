@@ -4,6 +4,7 @@ import {
   mergeCannoliItems,
   serializeItem,
   serializeModifierList,
+  stripHiddenModifierOptions,
 } from "./serializers";
 import type { SnapshotItem, SnapshotModifierList } from "./types";
 
@@ -125,6 +126,15 @@ const SET_RESERVED_MODIFIER_NAMES: ReadonlySet<string> = new Set([
 ]);
 const SPECIAL_NOTES_LIST_NAME_SUFFIX = "special notes";
 
+// Modifier OPTION names that exist in Square but should NEVER surface in the
+// online ordering UI, regardless of which item or list they appear on.
+// Square uses "In-Store" as a default-on flag for staff-rung-up orders so the
+// kitchen knows the customer will pick a flavor at the counter; it has no
+// meaning for online checkout.
+const HIDDEN_MODIFIER_OPTION_NAMES: ReadonlySet<string> = new Set([
+  "In-Store",
+]);
+
 export async function getCatalog(): Promise<{ items: SnapshotItem[] }> {
   const client = squareClient();
   const locationId = squareLocationId();
@@ -198,7 +208,9 @@ export async function getCatalog(): Promise<{ items: SnapshotItem[] }> {
 
   applyLocationSoldOut(items, allModifierLists, itemObjects, modifierListsRaw, locationId);
 
-  const mergedItems = mergeCannoliItems(items, {
+  const cleanedItems = stripHiddenModifierOptions(items, HIDDEN_MODIFIER_OPTION_NAMES);
+
+  const mergedItems = mergeCannoliItems(cleanedItems, {
     iceCreamItemName: CANNOLI_ICE_CREAM_NAME,
     ricottaItemName: CANNOLI_RICOTTA_NAME,
     compositeName: CANNOLI_COMPOSITE_NAME,

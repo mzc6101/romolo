@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useOrder } from "./OrderProvider";
 import { VariationPicker } from "./order/VariationPicker";
 import { ModifierSet } from "./order/ModifierSet";
+import { SectionHeading } from "./order/SectionHeading";
 import { SquareCard, type SquareCardHandle } from "./order/SquareCard";
 import type {
   MenuSnapshot,
@@ -315,6 +316,81 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
   }
   return line.qty > 0;
 };
+
+// Short, user-facing label for a Square modifier list. Suffix-matched so
+// renames at the prefix end ("Cannoli Ricotta Filling" → "Cannoli Filling")
+// keep working as long as the trailing word is stable. Falls back to the
+// list name minus a leading "Cannoli [Ricotta|Ice Cream]" prefix.
+function shortLabelForList(name: string): string {
+  const lower = name.toLowerCase().trim();
+  if (lower.endsWith("ricotta filling")) return "ricotta flavor";
+  if (lower.endsWith("ice cream flavor")) return "ice cream flavor";
+  if (lower.endsWith("shell")) return "shell";
+  if (lower.endsWith("garnish")) return "garnish";
+  if (lower.endsWith("special notes")) return "notes";
+  if (lower.endsWith("multiple boxes")) return "multiple boxes";
+  if (lower.endsWith("flavors") || lower.endsWith("flavor")) return "flavor";
+  return (
+    lower.replace(/^cannoli\s+(ricotta\s+|ice cream\s+)?/, "").trim() || lower
+  );
+}
+
+// Mirrors `lineValid` but reports WHICH required pickers are unmet. Used by
+// the "+ Add another item" hint so the user knows what to fix on the
+// currently-expanded line. Items not yet picked return ["item"].
+function listMissingForLine(
+  line: OrderLine,
+  snapshot: MenuSnapshot,
+): string[] {
+  const item = snapshot.items.find((i) => i.id === line.itemId);
+  if (!item) return ["item"];
+  const missing: string[] = [];
+
+  if (!item.set && item.cannoliFillings && !line.fillingKey) {
+    missing.push("filling");
+  }
+  if (item.set) {
+    const opt = findSetOption(item, line);
+    const sideInStock =
+      opt &&
+      (line.setMode === "customize" && line.fillingKey === "ice_cream"
+        ? !!opt.iceCream?.inStock
+        : opt.inStock);
+    if (!opt || !sideInStock) missing.push("size");
+    if (line.setMode === "customize" && !line.fillingKey) {
+      missing.push("filling");
+    }
+  }
+
+  const variations = activeVariations(item, line.fillingKey);
+  if (!item.set && variations.length > 0) {
+    const v = variations.find((x) => x.id === line.variationId);
+    if (!v || !v.inStock) missing.push("size");
+  }
+
+  const modifierLists = activeModifierLists(
+    item,
+    line.fillingKey,
+    line.setMode,
+  );
+  for (const ml of modifierLists) {
+    if (ml.modifierType === "text") {
+      const text = (line.freeText[ml.id] ?? "").trim();
+      if (ml.minSelected > 0 && text.length === 0) {
+        missing.push(shortLabelForList(ml.name));
+      }
+      continue;
+    }
+    const sel = line.modifiers[ml.id] ?? [];
+    if (sel.length < ml.minSelected) {
+      missing.push(shortLabelForList(ml.name));
+      continue;
+    }
+    // A previously-picked modifier flipping to sold-out shouldn't surface as
+    // "missing" — it's a different problem the chip itself shows. Skip.
+  }
+  return missing;
+}
 
 const STEP_LABELS = ["When", "What", "How", "Review", "Pay"] as const;
 
@@ -853,12 +929,31 @@ function StepWhat({
           />
         ))}
       </div>
-      <button
-        onClick={addLine}
-        className="mt-4 px-5 py-3 text-[12px] font-bold tracking-[0.15em] uppercase border border-romolo-border text-romolo-charcoal hover:border-romolo-red hover:text-romolo-red transition-colors rounded-sm"
-      >
-        + Add another item
-      </button>
+      {(() => {
+        const expanded = order.lines.find((l) => l.id === expandedId);
+        const missing = expanded ? listMissingForLine(expanded, snapshot) : [];
+        const blocked = !!expanded && missing.length > 0;
+        return (
+          <div className="mt-4">
+            <button
+              onClick={addLine}
+              disabled={blocked}
+              className={`px-5 py-3 text-[12px] font-bold tracking-[0.15em] uppercase border rounded-sm transition-colors ${
+                blocked
+                  ? "border-romolo-border text-romolo-warm-gray/60 cursor-not-allowed"
+                  : "border-romolo-border text-romolo-charcoal hover:border-romolo-red hover:text-romolo-red"
+              }`}
+            >
+              + Add another item
+            </button>
+            {blocked && (
+              <div className="mt-1.5 text-[11px] text-romolo-warm-gray italic">
+                missing: {missing.join(", ")}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1207,9 +1302,10 @@ function OrderLineEditor({
 
       {item.cannoliFillings && !item.set && (
         <div className="mb-4">
-          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-            Filling
-          </h5>
+          <SectionHeading
+            label="Filling"
+            state={line.fillingKey ? "satisfied" : "required"}
+          />
           <div className="flex flex-wrap gap-2">
             {item.cannoliFillings.map((f) => {
               const sel = f.key === line.fillingKey;
@@ -1232,11 +1328,18 @@ function OrderLineEditor({
         </div>
       )}
 
-      {item.set && (
+      {item.set && (() => {
+        const picked = findSetOption(item, line);
+        const sideInStock =
+          picked &&
+          (line.setMode === "customize" && line.fillingKey === "ice_cream"
+            ? !!picked.iceCream?.inStock
+            : picked.inStock);
+        const setSizeState: "required" | "satisfied" =
+          picked && sideInStock ? "satisfied" : "required";
+        return (
         <div className="mb-4">
-          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-            Set Size
-          </h5>
+          <SectionHeading label="Set Size" state={setSizeState} />
           <div className="flex flex-wrap gap-2">
             {item.set.options.map((o) => {
               const sel =
@@ -1267,13 +1370,12 @@ function OrderLineEditor({
             })}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {item.set && item.cannoliFillings && (
         <div className="mb-4">
-          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-            Cannoli Options
-          </h5>
+          <SectionHeading label="Cannoli Options" state="satisfied" />
           <div className="flex flex-wrap gap-2">
             {(["default", "customize"] as const).map((mode) => {
               const sel = (line.setMode ?? "default") === mode;
@@ -1298,9 +1400,10 @@ function OrderLineEditor({
 
       {item.set && line.setMode === "customize" && item.cannoliFillings && (
         <div className="mb-4">
-          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-            Filling
-          </h5>
+          <SectionHeading
+            label="Filling"
+            state={line.fillingKey ? "satisfied" : "required"}
+          />
           <div className="flex flex-wrap gap-2">
             {item.cannoliFillings.map((f) => {
               const sel = f.key === line.fillingKey;

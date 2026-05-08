@@ -1,6 +1,7 @@
 "use client";
 
 import type { SnapshotVariation } from "@/lib/square/types";
+import { SectionHeading } from "./SectionHeading";
 
 const fmt = (cents: number) => "$" + (cents / 100).toFixed(2);
 
@@ -14,12 +15,13 @@ export function VariationPicker({
   onSelect: (id: string) => void;
 }) {
   if (variations.length === 0) return null;
+  const picked = variations.find((v) => v.id === selectedId);
+  const state: "required" | "satisfied" =
+    picked && picked.inStock ? "satisfied" : "required";
 
   return (
     <div className="mb-4">
-      <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-        Size
-      </h5>
+      <SectionHeading label="Size" state={state} />
       <div className="flex flex-wrap gap-2">
         {variations.map((v) => {
           const sel = v.id === selectedId;

@@ -508,9 +508,8 @@ describe("mergeCannoliItems", () => {
     expect(composite.kit).toBeUndefined();
     const [ic, ric] = composite.cannoliFillings!;
     expect(ic.variations.map((v) => v.id)).toEqual(["V_IC_FULL", "V_IC_MINI"]);
-    expect(ic.modifierLists.map((m) => m.name)).toEqual(["Cannoli Multiple Boxes", "Flavor"]);
+    expect(ic.modifierLists.map((m) => m.name)).toEqual(["Flavor"]);
     expect(ric.modifierLists.map((m) => m.name)).toEqual([
-      "Cannoli Multiple Boxes",
       "Shell",
       "Filling",
       "Garnish",
@@ -763,12 +762,18 @@ describe("mergeCannoliItems", () => {
       expect(set.set).toBeDefined();
     });
 
-    it("set composite has only the Special Notes modifier list and empty top-level variations", () => {
+    it("set composite carries Multiple Boxes + Special Notes at the top level and empty top-level variations", () => {
       const result = mergeCannoliItems([setIceCream(), setRicotta()], options);
       const set = result[2];
       expect(set.variations).toEqual([]);
-      expect(set.modifierLists.map((m) => m.id)).toEqual(["ML_NOTES"]);
-      expect(set.modifierLists[0].modifierType).toBe("text");
+      // Multiple Boxes lives only on the set composite (regular Cannoli has
+      // it stripped); Special Notes follows it. Order matters — modifierListRank
+      // in OrderFlow expects Boxes before Notes.
+      expect(set.modifierLists.map((m) => m.name)).toEqual([
+        "Cannoli Multiple Boxes",
+        "Cannoli Special Notes",
+      ]);
+      expect(set.modifierLists[1].modifierType).toBe("text");
     });
 
     it("set options resolve to the Full / Mini Ricotta variations with correct qtys and prices", () => {

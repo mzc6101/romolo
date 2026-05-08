@@ -93,13 +93,21 @@ function buildRegularComposite(
     compositeId: string;
     compositeName: string;
     kitModifierListName: string;
+    multipleBoxesModifierListName: string;
     setReservedModifierNames: ReadonlySet<string>;
   }
 ): SnapshotItem {
-  const stripKit = (lists: SnapshotModifierList[]) =>
-    lists.filter((ml) => ml.name !== options.kitModifierListName);
+  // Multiple Boxes is reserved for the Cannoli Set composite — set buyers
+  // need it to package multiple sets. On the regular Cannoli a single line
+  // is one box, so the list would only confuse the picker.
+  const stripKitAndBoxes = (lists: SnapshotModifierList[]) =>
+    lists.filter(
+      (ml) =>
+        ml.name !== options.kitModifierListName &&
+        ml.name !== options.multipleBoxesModifierListName,
+    );
   const strip = (lists: SnapshotModifierList[]) =>
-    stripReservedModifierOptions(stripKit(lists), options.setReservedModifierNames);
+    stripReservedModifierOptions(stripKitAndBoxes(lists), options.setReservedModifierNames);
   return {
     id: options.compositeId,
     name: options.compositeName,
@@ -202,6 +210,21 @@ function stripReservedModifierOptions(
       ? { ...ml, modifiers: ml.modifiers.filter((m) => !reserved.has(m.name)) }
       : ml,
   );
+}
+
+// Strips modifier OPTION names that should never surface online (e.g.
+// "In-Store") from every list on every item. Applied catalog-wide before
+// composite merging so downstream code (cannoli composites, line-valid
+// checks, summarize) all see a clean snapshot with no hidden options.
+export function stripHiddenModifierOptions(
+  items: SnapshotItem[],
+  hidden: ReadonlySet<string>,
+): SnapshotItem[] {
+  if (hidden.size === 0) return items;
+  return items.map((item) => ({
+    ...item,
+    modifierLists: stripReservedModifierOptions(item.modifierLists, hidden),
+  }));
 }
 
 // Resolves the Cannoli Set composite from the Ricotta item. Returns null
@@ -312,6 +335,14 @@ function buildSetComposite(
     return null;
   }
 
+  // Multiple Boxes lives on the Set composite (and only there) — set buyers
+  // commonly want each guest to walk away with their own box. Pulled from
+  // Ricotta because both filling items carry the same shared list. Absent =
+  // skip; the set otherwise renders fine, just without the option.
+  const multipleBoxesList = ricotta.modifierLists.find(
+    (ml) => ml.name === options.multipleBoxesModifierListName,
+  );
+
   // Build per-filling modifier lists for Customize mode. Strip:
   //   - "Cannoli Multiple Boxes" — a set is one packaged unit.
   //   - "Cannoli Kit" — vestigial modifier reserved for the Kit composite.
@@ -352,7 +383,9 @@ function buildSetComposite(
     description: undefined,
     categoryName: ricotta.categoryName,
     variations: [],
-    modifierLists: [specialNotesList],
+    modifierLists: multipleBoxesList
+      ? [multipleBoxesList, specialNotesList]
+      : [specialNotesList],
     cannoliFillings,
     set,
   };
