@@ -1633,7 +1633,7 @@ function QtyStepper({
         onClick={() => onChange(Math.max(min, qty - step))}
         disabled={dec}
         style={{ width: sz, height: sz }}
-        className={`text-base ${dec ? "text-[#c0bbb3] cursor-not-allowed" : "text-romolo-charcoal hover:bg-romolo-cream"}`}
+        className={`flex shrink-0 items-center justify-center rounded-full text-base ${dec ? "text-[#c0bbb3] cursor-not-allowed" : "text-romolo-charcoal hover:bg-romolo-cream"}`}
       >
         −
       </button>
@@ -1647,7 +1647,7 @@ function QtyStepper({
         onClick={() => (max != null ? onChange(Math.min(max, qty + step)) : onChange(qty + step))}
         disabled={inc}
         style={{ width: sz, height: sz }}
-        className={`text-base ${inc ? "text-[#c0bbb3] cursor-not-allowed" : "text-romolo-charcoal hover:bg-romolo-cream"}`}
+        className={`flex shrink-0 items-center justify-center rounded-full text-base ${inc ? "text-[#c0bbb3] cursor-not-allowed" : "text-romolo-charcoal hover:bg-romolo-cream"}`}
       >
         +
       </button>
