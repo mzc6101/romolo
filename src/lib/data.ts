@@ -40,7 +40,7 @@ export const MENU_DATA: MenuCategory[] = [
       {
         id: "cannoli-mini",
         name: "Cannoli — Mini",
-        description: "Bite-sized, sold by the dozen for sharing",
+        description: "Bite-sized, perfect for sharing",
         price: 2.25,
         imageUrl:
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328556/_N8Z0787_acdfse.jpg",
