@@ -1113,7 +1113,7 @@ function StepWhat({
 // live snapshot — items missing from Square (e.g. seasonal removal) are
 // silently skipped, and a category that ends up empty is hidden.
 const PICKER_CATEGORIES: Array<{ title: string; items: string[] }> = [
-  { title: "Cannoli", items: ["Cannoli", "Cannoli Set", "Cannoli Kit"] },
+  { title: "Cannoli", items: ["Cannoli Set", "Cannoli", "Cannoli Kit"] },
   {
     title: "Desserts",
     items: ["Chocolate Banana", "Cookies", "Spumoni Wedge", "Tartufi", "Tiramisu"],
