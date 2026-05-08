@@ -33,7 +33,7 @@ export default function Hero() {
         </h1>
 
         <p className="font-[var(--font-serif)] text-lg md:text-xl text-white/80 font-light italic max-w-lg mx-auto mb-10">
-          Best cannoli in the bay!
+          “Best cannoli in the bay!”
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
