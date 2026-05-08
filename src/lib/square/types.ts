@@ -28,9 +28,11 @@ export type SnapshotItem = {
   categoryName?: string;
   variations: SnapshotVariation[];
   modifierLists: SnapshotModifierList[];
-  // Composite-only. When set, the frontend renders a filling-type chip picker
-  // and the active filling supplies its own variations + modifier lists. The
-  // top-level variations/modifierLists arrays are empty in that case.
+  // Set on the synthetic "Cannoli" + "Cannoli Kit" composites. The frontend
+  // renders a filling-type chip picker and the active filling supplies its
+  // own variations + modifier lists. The top-level variations/modifierLists
+  // arrays are empty in that case. The Set composite does NOT use this field
+  // — its filling-type lives in a Square modifier list (see SetInfo).
   cannoliFillings?: CannoliFilling[];
   // Set on the synthetic "Cannoli Kit" composite. Carries the qty grouping
   // rules the UI enforces (step=groupSize, min=groupSize) and the per-kit fee
@@ -38,12 +40,13 @@ export type SnapshotItem = {
   // the Square order (Square modifier prices always scale with line qty, so
   // a modifier-based fee can't express "$2 per 6 cannolis").
   kit?: KitInfo;
-  // Set on the synthetic "Cannoli Set" composite. Fixed-recipe Ricotta build
-  // (Ricotta filling + Chocolate shell + Mixed garnish) sold in three sizes
-  // (6 Full / 12 Full / 24 Mini). The user picks a size; recipe and qty are
-  // not editable. Modifiers are auto-applied via line.modifiers at addLine
-  // time and flushed to Square unchanged. Pricing is variation × qty (no
-  // set fee, no ad-hoc line).
+  // Set on the "Cannoli Set" composite, which is now a passthrough of the
+  // "Cannoli Online - Set" Square item (variations = sizes, modifier lists
+  // include the filling-type chooser + per-filling rows). SetInfo carries the
+  // ids the frontend needs to (a) drive conditional show/hide of the
+  // ricotta/ice-cream-only lists based on the filling-type modifier
+  // selection, and (b) seed the default recipe (Ricotta + Original /
+  // Chocolate / Mixed Garnish) when a Set line is added.
   set?: SetInfo;
 };
 
@@ -52,51 +55,30 @@ export type KitInfo = {
   groupSize: number;
 };
 
-// One pickable size on the Cannoli Set composite. variationId + qty pair
-// resolves uniquely (e.g. 6 Full and 12 Full share variationId but differ
-// in qty), so any (variationId, qty) match identifies the option. inStock
-// is captured at catalog-build time from the underlying Ricotta variation.
-export type SetOption = {
-  key: string;
-  label: string;
-  variationId: string;
-  qty: number;
-  // Per-cannoli price captured from the underlying Ricotta variation at
-  // catalog-build time. The total set subtotal is priceCents × qty (no set
-  // fee). Square recomputes pricing server-side at order-create from the
-  // variationId, so this is purely for the UI subtotal display.
-  priceCents: number;
-  inStock: boolean;
-  // Ice Cream equivalent for this size, used by Customize mode when the
-  // user switches the filling type. Omitted when the Ice Cream item lacks a
-  // matching variation (Customize → Ice Cream chip will then reflect the
-  // size as out-of-stock for that filling).
-  iceCream?: {
-    variationId: string;
-    priceCents: number;
-    inStock: boolean;
-  };
-};
-
-// Modifier auto-applied to every Cannoli Set line (Filling=Ricotta,
-// Shell=Chocolate, Garnish=Mixed). Lookup is by name from the Ricotta
-// item's modifier lists at catalog-build time. soldOut mirrors
-// SnapshotModifier.soldOut so lineValid can reject without a second
-// lookup.
-export type AutoModifierRef = {
-  modifierListId: string;
-  modifierId: string;
-  soldOut?: boolean;
-};
-
 export type SetInfo = {
-  options: SetOption[];
-  autoModifiers: AutoModifierRef[];
+  // The "Cannoli Set Filling" modifier list — its single selection drives
+  // conditional visibility of the per-filling lists below.
+  fillingTypeListId: string;
+  ricottaModifierId: string;
+  iceCreamModifierId: string;
+  // Modifier list ids that should only render when Ricotta is the active
+  // filling type. Includes Shell, Filling (ricotta flavor), Garnish.
+  ricottaOnlyListIds: string[];
+  // Modifier list ids that should only render when Ice Cream is active.
+  // Includes Ice Cream Flavor.
+  iceCreamOnlyListIds: string[];
+  // Pre-selections applied when a Set line is added: filling type = Ricotta
+  // plus Ricotta's default flavor / shell / garnish. Mirrors the legacy
+  // "Default" mode recipe so the user can complete a set in zero clicks
+  // (just pick a size, hit Continue) but can change anything from there.
+  defaultSelections: Array<{ listId: string; modifierIds: string[] }>;
 };
 
-// One filling-type branch under the composite "Cannoli" item. `squareItemId`
-// is the underlying Square ITEM the variations + modifiers come from; we keep
-// it for traceability but order submission uses the variation id directly.
+// One filling-type branch under the composite "Cannoli" / "Cannoli Kit"
+// items. `squareItemId` is the underlying Square ITEM the variations +
+// modifiers come from; we keep it for traceability but order submission uses
+// the variation id directly. Not used by the Set composite — Set carries
+// filling type as a Square modifier instead.
 export type CannoliFilling = {
   key: string;          // stable e.g. "ice_cream", "ricotta"
   label: string;        // user-facing e.g. "Ice Cream", "Ricotta"

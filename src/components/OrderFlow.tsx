@@ -24,27 +24,34 @@ type Contact = { name: string; phone: string; email: string };
 type OrderLine = {
   id: string;
   itemId: string;       // SnapshotItem.id
-  // Composite-item lines (e.g. Cannoli) carry the picked filling-type key —
+  // Cannoli + Cannoli Kit composite lines carry the picked filling-type key —
   // determines which underlying Square item supplies the variations + mods.
+  // Not used by the Set composite (filling type is a Square modifier instead).
   fillingKey?: string;
   variationId: string;  // SnapshotVariation.id
   qty: number;
   modifiers: Record<string, string[]>; // modifierListId -> selected modifier ids
   freeText: Record<string, string>;    // modifierListId (TEXT) -> entered text
-  // Cannoli Set lines only. "default" runs the fixed recipe (Original /
-  // Chocolate / Mixed Garnish auto-applied); "customize" exposes the
-  // underlying filling's modifier lists for user-driven configuration.
-  setMode?: "default" | "customize";
 };
+
+// Returns the Set composite's selected filling-type key — "ricotta" |
+// "ice_cream" | undefined — based on which option the user has picked in the
+// "Cannoli Set Filling" modifier list.
+function setFillingType(
+  item: SnapshotItem,
+  modifiers: Record<string, string[]>,
+): "ricotta" | "ice_cream" | undefined {
+  if (!item.set) return undefined;
+  const sel = modifiers[item.set.fillingTypeListId]?.[0];
+  if (sel === item.set.ricottaModifierId) return "ricotta";
+  if (sel === item.set.iceCreamModifierId) return "ice_cream";
+  return undefined;
+}
 
 function activeVariations(
   item: SnapshotItem,
   fillingKey: string | undefined
 ): SnapshotVariation[] {
-  // Set items expose variation through the size chip picker, not a
-  // VariationPicker — so suppress the variation list entirely. The chip
-  // picker writes the resolved variationId straight onto the line.
-  if (item.set) return [];
   if (item.cannoliFillings) {
     const f = item.cannoliFillings.find((x) => x.key === fillingKey);
     return f?.variations ?? [];
@@ -55,40 +62,24 @@ function activeVariations(
 function activeModifierLists(
   item: SnapshotItem,
   fillingKey: string | undefined,
-  setMode?: "default" | "customize"
+  modifiers?: Record<string, string[]>,
 ): SnapshotModifierList[] {
   if (item.set) {
-    // Customize: per-filling lists (Shell / Filling / Garnish for Ricotta;
-    // Flavor for Ice Cream — already pre-stripped of Multiple Boxes and
-    // per-filling Special Notes) plus the top-level Set Special Notes.
-    if (setMode === "customize" && fillingKey && item.cannoliFillings) {
-      const f = item.cannoliFillings.find((x) => x.key === fillingKey);
-      return [...(f?.modifierLists ?? []), ...item.modifierLists];
-    }
-    // Default: only Special Notes is visible; recipe is auto-applied.
-    return item.modifierLists;
+    // Filter conditional lists based on the active filling-type selection.
+    // Lists matching neither bucket (Multiple Boxes, Special Notes,
+    // and the filling-type list itself) are universal.
+    const ft = setFillingType(item, modifiers ?? {});
+    return item.modifierLists.filter((ml) => {
+      if (item.set!.ricottaOnlyListIds.includes(ml.id)) return ft === "ricotta";
+      if (item.set!.iceCreamOnlyListIds.includes(ml.id)) return ft === "ice_cream";
+      return true;
+    });
   }
   if (item.cannoliFillings) {
     const f = item.cannoliFillings.find((x) => x.key === fillingKey);
     return f?.modifierLists ?? [];
   }
   return item.modifierLists;
-}
-
-// Resolves the SetOption matching a line's current variationId+qty. Matches
-// either the Ricotta variationId or the Ice Cream equivalent so Customize-
-// Ice Cream lines (whose variationId points to an Ice Cream variation) still
-// resolve to the right size option.
-function findSetOption(
-  item: SnapshotItem,
-  line: { variationId: string; qty: number }
-) {
-  return item.set?.options.find(
-    (o) =>
-      (o.variationId === line.variationId ||
-        o.iceCream?.variationId === line.variationId) &&
-      o.qty === line.qty
-  );
 }
 
 // Builds the per-line payload sent to /api/orders and /api/orders/calculate.
@@ -100,18 +91,15 @@ function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
   const item = snapshot.items.find((i) => i.id === line.itemId);
   const noteParts: string[] = [];
   if (item) {
-    if (item.set && line.variationId) {
-      const opt = findSetOption(item, line);
-      if (opt) noteParts.push(`Set: ${opt.label}`);
-    }
     if (item.kit) {
-      // Mirrors the Set composite: a fixed prefix on the cannoli line so the
-      // kitchen ticket reads "Cannoli Kit | <other notes>" at a glance. The
-      // sibling ad-hoc fee line (qty × $2) is the source of truth for kit
-      // count.
+      // A fixed prefix on the cannoli line so the kitchen ticket reads
+      // "Cannoli Kit | <other notes>" at a glance. The sibling ad-hoc fee
+      // line (qty × $2) is the source of truth for kit count. The Set
+      // composite intentionally adds no prefix — the variation name on the
+      // Square line ("Full Size - Set of 12" etc.) is self-describing.
       noteParts.push("Cannoli Kit");
     }
-    for (const ml of activeModifierLists(item, line.fillingKey, line.setMode)) {
+    for (const ml of activeModifierLists(item, line.fillingKey, line.modifiers)) {
       if (ml.modifierType !== "text") continue;
       const text = (line.freeText[ml.id] ?? "").trim();
       if (text.length === 0) continue;
@@ -177,12 +165,12 @@ const lineId = () => Math.random().toString(36).slice(2, 8);
 
 // Seed defaults for a fresh OrderLine: leaves required SINGLE-list selections
 // empty (user must pick) so the "required" enforcement works, but pre-fills
-// nothing for optional / TEXT / MULTIPLE lists. For set items the caller
-// also passes the auto-applied modifier refs so they ride along on the
-// line and flush to Square at submit even though no UI surfaces them.
+// nothing for optional / TEXT / MULTIPLE lists. Optional `defaults` lets the
+// caller pre-select specific modifiers — used by the Set composite to seed
+// Filling Type=Ricotta + the default Ricotta recipe at line creation.
 function seedSelectionsForLists(
   modifierLists: SnapshotModifierList[],
-  autoModifiers: ReadonlyArray<{ modifierListId: string; modifierId: string }> = [],
+  defaults: ReadonlyArray<{ listId: string; modifierIds: string[] }> = [],
 ) {
   const modifiers: Record<string, string[]> = {};
   const freeText: Record<string, string> = {};
@@ -193,8 +181,8 @@ function seedSelectionsForLists(
       modifiers[ml.id] = [];
     }
   }
-  for (const am of autoModifiers) {
-    modifiers[am.modifierListId] = [am.modifierId];
+  for (const d of defaults) {
+    modifiers[d.listId] = [...d.modifierIds];
   }
   return { modifiers, freeText };
 }
@@ -205,21 +193,21 @@ function seedSelectionsForLists(
 // Non-composite items preselect the first in-stock variation.
 function buildLineSeedForItem(item: SnapshotItem) {
   if (item.set) {
-    // Set: variation + qty are picked via size chip; modifiers list contains
-    // only Special Notes (TEXT). Auto modifiers (Filling/Shell/Garnish) ride
-    // along in line.modifiers so they flush to Square at submit unchanged.
-    // Lines start in Default mode — the "Cannoli Options" chip toggles to
-    // Customize.
+    // Set: pre-select the first in-stock variation and apply the default
+    // recipe (Filling Type=Ricotta, Original / Chocolate / Mixed Garnish).
+    // The user can complete the line in zero clicks if they want defaults,
+    // or tweak any of the pre-filled modifiers.
+    const firstVariation =
+      item.variations.find((v) => v.inStock) ?? item.variations[0];
     const { modifiers, freeText } = seedSelectionsForLists(
       item.modifierLists,
-      item.set.autoModifiers,
+      item.set.defaultSelections,
     );
     return {
-      variationId: "",
-      qty: 0,
+      variationId: firstVariation?.id ?? "",
+      qty: 1,
       modifiers,
       freeText,
-      setMode: "default" as const,
     };
   }
   if (item.cannoliFillings) {
@@ -230,7 +218,6 @@ function buildLineSeedForItem(item: SnapshotItem) {
       qty: item.kit ? item.kit.groupSize : 1,
       modifiers: {},
       freeText: {},
-      setMode: undefined,
     };
   }
   const firstVariation =
@@ -241,7 +228,6 @@ function buildLineSeedForItem(item: SnapshotItem) {
     qty: item.kit ? item.kit.groupSize : 1,
     modifiers,
     freeText,
-    setMode: undefined,
   };
 }
 
@@ -310,9 +296,10 @@ const fmtCents = (c: number) => "$" + (c / 100).toFixed(2);
 const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
   const item = snapshot.items.find((i) => i.id === line.itemId);
   if (!item) return false;
-  // Filling pick is required for non-set composites (regular Cannoli, Kit)
-  // and for set lines in Customize mode. Default-mode set lines have no
-  // filling concept.
+  // Filling pick is required for non-set composites (regular Cannoli, Kit).
+  // The Set composite carries filling type as a regular Square modifier
+  // ("Cannoli Set Filling"), so its required-ness is enforced by the
+  // standard min-selected check on that list further down.
   if (!item.set && item.cannoliFillings && !line.fillingKey) return false;
   if (item.kit) {
     // Kit lines must be in whole groups (a kit covers exactly groupSize
@@ -321,36 +308,12 @@ const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
     if (line.qty < item.kit.groupSize) return false;
     if (line.qty % item.kit.groupSize !== 0) return false;
   }
-  if (item.set) {
-    // Set lines must match exactly one of the predefined size options.
-    // In Customize mode the variationId can also match the Ice Cream side
-    // of the option; findSetOption handles both. inStock is checked
-    // against the side actually in use.
-    if (!line.variationId) return false;
-    if (line.setMode === "customize" && !line.fillingKey) return false;
-    const opt = findSetOption(item, line);
-    if (!opt) return false;
-    const sideInStock =
-      line.setMode === "customize" && line.fillingKey === "ice_cream"
-        ? !!opt.iceCream?.inStock
-        : opt.inStock;
-    if (!sideInStock) return false;
-    // Default mode: auto-applied modifiers must not be sold out. Customize
-    // mode replaces the auto-recipe with user picks, so soldOut on the
-    // default modifiers is irrelevant — required-list enforcement below
-    // catches anything else the user must pick.
-    if (
-      line.setMode !== "customize" &&
-      item.set.autoModifiers.some((am) => am.soldOut)
-    ) {
-      return false;
-    }
-  }
   const variations = activeVariations(item, line.fillingKey);
-  const modifierLists = activeModifierLists(item, line.fillingKey, line.setMode);
-  // Set lines satisfy the variation in-stock check above; activeVariations
-  // returns [] for set items, so skip the standard variation lookup.
-  if (!item.set) {
+  const modifierLists = activeModifierLists(item, line.fillingKey, line.modifiers);
+  // Variation must be picked + in stock for every item type. Composite items
+  // without a chosen filling have an empty variations list (handled below by
+  // the activeVariations check).
+  if (variations.length > 0 || item.set) {
     const variation = variations.find((v) => v.id === line.variationId);
     if (!variation || !variation.inStock) return false;
   }
@@ -407,29 +370,17 @@ function listMissingForLine(
   if (!item.set && item.cannoliFillings && !line.fillingKey) {
     missing.push("filling");
   }
-  if (item.set) {
-    const opt = findSetOption(item, line);
-    const sideInStock =
-      opt &&
-      (line.setMode === "customize" && line.fillingKey === "ice_cream"
-        ? !!opt.iceCream?.inStock
-        : opt.inStock);
-    if (!opt || !sideInStock) missing.push("size");
-    if (line.setMode === "customize" && !line.fillingKey) {
-      missing.push("filling");
-    }
-  }
 
   const variations = activeVariations(item, line.fillingKey);
-  if (!item.set && variations.length > 0) {
+  if (variations.length > 0) {
     const v = variations.find((x) => x.id === line.variationId);
-    if (!v || !v.inStock) missing.push("size");
+    if (!v || !v.inStock) missing.push(item.set ? "set size" : "size");
   }
 
   const modifierLists = activeModifierLists(
     item,
     line.fillingKey,
-    line.setMode,
+    line.modifiers,
   );
   for (const ml of modifierLists) {
     if (ml.modifierType === "text") {
@@ -998,7 +949,7 @@ function StepWhat({
           qty: 1,
           modifiers: {},
           freeText: {},
-        },
+        } as OrderLine,
       ],
     });
     setExpandedId(newId);
@@ -1257,7 +1208,7 @@ function OrderLineEditor({
   }
 
   const variations = activeVariations(item, line.fillingKey);
-  const modifierLists = activeModifierLists(item, line.fillingKey, line.setMode);
+  const modifierLists = activeModifierLists(item, line.fillingKey, line.modifiers);
   const orderedModifierLists = [...modifierLists].sort(
     (a, b) => modifierListRank(a.name) - modifierListRank(b.name),
   );
@@ -1270,7 +1221,6 @@ function OrderLineEditor({
       qty: 1,
       modifiers: {},
       freeText: {},
-      setMode: undefined,
     });
 
   const onFillingChange = (key: string) => {
@@ -1293,83 +1243,39 @@ function OrderLineEditor({
     });
   };
 
-  const onSetOptionChange = (key: string) => {
-    if (!item.set) return;
-    const opt = item.set.options.find((o) => o.key === key);
-    if (!opt) return;
-    // In Customize → Ice Cream the line tracks the Ice Cream variation; the
-    // Ricotta variation is used otherwise.
-    const variationId =
-      line.setMode === "customize" && line.fillingKey === "ice_cream"
-        ? (opt.iceCream?.variationId ?? "")
-        : opt.variationId;
-    onChange({ variationId, qty: opt.qty });
-  };
-
-  // Toggling between Default and Customize. Default reverts to the auto-
-  // recipe (variationId snaps back to Ricotta for the current size, modifier
-  // selections clear except for the autoModifier seed). Customize switches
-  // into Ricotta filling with the auto-recipe pre-filled as a normal user
-  // selection — they can change anything from there.
-  const onSetModeChange = (mode: "default" | "customize") => {
-    if (!item.set) return;
-    if (mode === line.setMode) return;
-    const opt = findSetOption(item, line);
-    if (mode === "default") {
-      const ricottaVarId = opt?.variationId ?? "";
-      const { modifiers, freeText } = seedSelectionsForLists(
-        item.modifierLists,
-        item.set.autoModifiers,
-      );
-      onChange({
-        setMode: "default",
-        fillingKey: undefined,
-        variationId: ricottaVarId,
-        modifiers,
-        freeText,
-      });
+  // Set lines: when the user changes the filling-type modifier ("Cannoli Set
+  // Filling": Ricotta ↔ Ice Cream), wipe the now-hidden conditional lists'
+  // selections so nothing stale leaks into the order payload, and re-apply
+  // the Ricotta default recipe (Original / Chocolate / Mixed Garnish) when
+  // switching to Ricotta. Switching to Ice Cream leaves Flavor blank for the
+  // user to pick. Non-filling-type modifier changes pass through unchanged.
+  const onModifierChange = (listId: string, ids: string[]) => {
+    if (item.set && listId === item.set.fillingTypeListId) {
+      const next = { ...line.modifiers, [listId]: ids };
+      const newType = setFillingType(item, next);
+      const cleared: Record<string, string[]> = { ...next };
+      for (const id of [
+        ...item.set.ricottaOnlyListIds,
+        ...item.set.iceCreamOnlyListIds,
+      ]) {
+        cleared[id] = [];
+      }
+      if (newType === "ricotta") {
+        // Re-apply Ricotta defaults but keep the user's freshly-picked
+        // filling-type selection. defaultSelections already includes the
+        // filling-type entry — overlaying it on `ids` is a no-op when the
+        // user's pick matches the default, and a recovery when (e.g.) the
+        // saved cart had a stale value.
+        for (const d of item.set.defaultSelections) {
+          // Skip the filling-type list itself — `ids` is the source of truth.
+          if (d.listId === item.set.fillingTypeListId) continue;
+          cleared[d.listId] = [...d.modifierIds];
+        }
+      }
+      onChange({ modifiers: cleared });
       return;
     }
-    // mode === "customize"
-    const ricotta = item.cannoliFillings?.find((f) => f.key === "ricotta");
-    if (!ricotta) return;
-    const ricottaVarId = opt?.variationId ?? "";
-    const { modifiers, freeText } = seedSelectionsForLists(
-      [...ricotta.modifierLists, ...item.modifierLists],
-      item.set.autoModifiers,
-    );
-    onChange({
-      setMode: "customize",
-      fillingKey: "ricotta",
-      variationId: ricottaVarId,
-      modifiers,
-      freeText,
-    });
-  };
-
-  // Filling-type chip on a Customize-mode set line. Switching wipes all
-  // modifier selections (the pre-fill recipe is Ricotta-specific and has no
-  // Ice Cream analogue) and re-resolves the variationId to the new filling's
-  // equivalent for the current size.
-  const onSetFillingChange = (key: string) => {
-    if (!item.set || line.setMode !== "customize") return;
-    const filling = item.cannoliFillings?.find((f) => f.key === key);
-    if (!filling) return;
-    const opt = findSetOption(item, line);
-    const newVariationId =
-      key === "ice_cream"
-        ? (opt?.iceCream?.variationId ?? "")
-        : (opt?.variationId ?? "");
-    const { modifiers, freeText } = seedSelectionsForLists(
-      [...filling.modifierLists, ...item.modifierLists],
-      key === "ricotta" ? item.set.autoModifiers : [],
-    );
-    onChange({
-      fillingKey: key,
-      variationId: newVariationId,
-      modifiers,
-      freeText,
-    });
+    onChange({ modifiers: { ...line.modifiers, [listId]: ids } });
   };
 
   return (
@@ -1462,104 +1368,6 @@ function OrderLineEditor({
         </div>
       )}
 
-      {item.set && (() => {
-        const picked = findSetOption(item, line);
-        const sideInStock =
-          picked &&
-          (line.setMode === "customize" && line.fillingKey === "ice_cream"
-            ? !!picked.iceCream?.inStock
-            : picked.inStock);
-        const setSizeState: "required" | "satisfied" =
-          picked && sideInStock ? "satisfied" : "required";
-        return (
-        <div className="mb-4">
-          <SectionHeading label="Set Size" state={setSizeState} />
-          <div className="flex flex-wrap gap-2">
-            {item.set.options.map((o) => {
-              const sel =
-                (o.variationId === line.variationId ||
-                  o.iceCream?.variationId === line.variationId) &&
-                o.qty === line.qty;
-              const disabled =
-                line.setMode === "customize" && line.fillingKey === "ice_cream"
-                  ? !o.iceCream?.inStock
-                  : !o.inStock;
-              return (
-                <button
-                  key={o.key}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => onSetOptionChange(o.key)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    disabled
-                      ? "bg-romolo-cream/60 text-romolo-warm-gray/50 border-romolo-border line-through cursor-not-allowed"
-                      : sel
-                        ? "bg-romolo-charcoal text-white border-romolo-charcoal"
-                        : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        );
-      })()}
-
-      {item.set && item.cannoliFillings && (
-        <div className="mb-4">
-          <SectionHeading label="Cannoli Options" state="satisfied" />
-          <div className="flex flex-wrap gap-2">
-            {(["default", "customize"] as const).map((mode) => {
-              const sel = (line.setMode ?? "default") === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => onSetModeChange(mode)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    sel
-                      ? "bg-romolo-charcoal text-white border-romolo-charcoal"
-                      : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
-                  }`}
-                >
-                  {mode === "default" ? "Default" : "Customize"}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {item.set && line.setMode === "customize" && item.cannoliFillings && (
-        <div className="mb-4">
-          <SectionHeading
-            label="Filling"
-            state={line.fillingKey ? "satisfied" : "required"}
-          />
-          <div className="flex flex-wrap gap-2">
-            {item.cannoliFillings.map((f) => {
-              const sel = f.key === line.fillingKey;
-              return (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => onSetFillingChange(f.key)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    sel
-                      ? "bg-romolo-charcoal text-white border-romolo-charcoal"
-                      : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {variations.length > 1 && (() => {
         // Cannoli composite has tiered Square pricing rules (the per-chip
         // price would be misleading since the actual unit price drops as
@@ -1587,6 +1395,7 @@ function OrderLineEditor({
               selectedId={line.variationId}
               onSelect={(id) => onChange({ variationId: id })}
               hidePrice={isCannoli}
+              label={item.set ? "Set Size" : "Size"}
             />
             {tierNote && (
               <div className="-mt-2 mb-4 text-[12px] italic text-romolo-warm-gray">
@@ -1602,9 +1411,7 @@ function OrderLineEditor({
           key={ml.id}
           list={ml}
           selectedIds={line.modifiers[ml.id] ?? []}
-          onChange={(ids) =>
-            onChange({ modifiers: { ...line.modifiers, [ml.id]: ids } })
-          }
+          onChange={(ids) => onModifierChange(ml.id, ids)}
           text={line.freeText[ml.id] ?? ""}
           onTextChange={(value) =>
             onChange({ freeText: { ...line.freeText, [ml.id]: value } })
@@ -1846,29 +1653,18 @@ const ORDER_NOTE_MAX = 500;
 function summarizeLine(line: OrderLine, item: SnapshotItem): string {
   const parts: string[] = [];
 
-  // Set lines: size label is implicit in the item (Cannoli Set), but mode
-  // (Default vs Customize) is meaningful to surface.
-  if (item.set) {
-    const opt = findSetOption(item, line);
-    if (opt) parts.push(opt.label);
-    if (line.setMode === "customize") {
-      const filling = item.cannoliFillings?.find((f) => f.key === line.fillingKey);
-      if (filling) parts.push(`Customize · ${filling.label}`);
-    } else {
-      parts.push("Default recipe");
-    }
-  } else if (item.cannoliFillings) {
+  if (item.cannoliFillings) {
     const filling = item.cannoliFillings.find((f) => f.key === line.fillingKey);
     if (filling) parts.push(filling.label);
   }
 
   const variations = activeVariations(item, line.fillingKey);
-  if (!item.set && variations.length > 1) {
+  if (variations.length > 1) {
     const v = variations.find((x) => x.id === line.variationId);
     if (v) parts.push(v.name);
   }
 
-  const modifierLists = activeModifierLists(item, line.fillingKey, line.setMode);
+  const modifierLists = activeModifierLists(item, line.fillingKey, line.modifiers);
   for (const ml of modifierLists) {
     if (ml.modifierType === "text") {
       const text = (line.freeText[ml.id] ?? "").trim();
