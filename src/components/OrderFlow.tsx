@@ -256,6 +256,55 @@ const initialOrder = (): Order => ({
   confirmation: "",
 });
 
+// Closing the modal (or the whole tab) shouldn't wipe an in-progress cart.
+// We persist {order, step} to localStorage and rehydrate on next open.
+// Only steps 0–4 are persisted; step 5 is the post-submit confirmation and
+// is cleared explicitly on success.
+const CART_STORAGE_KEY = "romolo:order:v1";
+
+type PersistedCart = { order: Order; step: number };
+
+function loadPersistedCart(): PersistedCart | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedCart;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !parsed.order ||
+      typeof parsed.step !== "number" ||
+      parsed.step < 0 ||
+      parsed.step >= 5 ||
+      !Array.isArray(parsed.order.lines)
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedCart(cart: PersistedCart) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  } catch {
+    // localStorage unavailable / quota exceeded — silently degrade.
+  }
+}
+
+function clearPersistedCart() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(CART_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 const fmtCents = (c: number) => "$" + (c / 100).toFixed(2);
 
 const lineValid = (line: OrderLine, snapshot: MenuSnapshot): boolean => {
@@ -405,23 +454,44 @@ const STEP_LABELS = ["When", "What", "How", "Review", "Pay"] as const;
 
 export default function OrderFlow() {
   const { isOpen, close, snapshot } = useOrder();
-  const [step, setStep] = useState(0);
-  const [order, setOrder] = useState<Order>(initialOrder);
+  const [step, setStep] = useState<number>(() => loadPersistedCart()?.step ?? 0);
+  const [order, setOrder] = useState<Order>(
+    () => loadPersistedCart()?.order ?? initialOrder()
+  );
   const [cardHandle, setCardHandle] = useState<SquareCardHandle | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const totals = useCalculatedTotals(order, snapshot);
   const lineTotals = totals?.lineTotals ?? {};
 
+  // Reset transient UI state every time the modal opens. Cart contents
+  // (order + step) deliberately survive across opens so a user who closes
+  // mid-flow can pick up where they left off.
   useEffect(() => {
     if (isOpen) {
-      setStep(0);
-      setOrder(initialOrder());
       setCardHandle(null);
       setSubmitting(false);
       setErrorBanner(null);
     }
   }, [isOpen]);
+
+  // Persist cart on every change so a tab close / refresh doesn't wipe it.
+  // Skip step 5 (post-submit confirmation) — that order is done.
+  useEffect(() => {
+    if (step >= 5) return;
+    savePersistedCart({ order, step });
+  }, [order, step]);
+
+  // After the confirmation modal is dismissed, reset for the next session.
+  // Without this, reopening the modal in the same tab would land back on
+  // the success screen with stale order details.
+  const handleClose = () => {
+    if (step === 5) {
+      setStep(0);
+      setOrder(initialOrder());
+    }
+    close();
+  };
 
   if (!isOpen) return null;
 
@@ -464,6 +534,7 @@ export default function OrderFlow() {
     setSubmitting(false);
 
     if (result.status === "ok") {
+      clearPersistedCart();
       setOrder({ ...order, confirmation: result.confirmation });
       setStep(5);
       return;
@@ -508,7 +579,7 @@ export default function OrderFlow() {
       style={{ background: "rgba(20, 18, 16, 0.55)", animation: "overlay-in 0.3s var(--ease-out-expo)" }}
       role="dialog"
       aria-modal="true"
-      onClick={close}
+      onClick={handleClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -534,7 +605,7 @@ export default function OrderFlow() {
             )}
           </div>
           <button
-            onClick={close}
+            onClick={handleClose}
             aria-label="Close"
             className="text-2xl leading-none text-romolo-warm-gray hover:text-romolo-charcoal transition-colors p-1"
           >
@@ -560,7 +631,7 @@ export default function OrderFlow() {
               errorBanner={errorBanner}
             />
           )}
-          {step === 5 && <StepDone order={order} onClose={close} />}
+          {step === 5 && <StepDone order={order} onClose={handleClose} />}
         </div>
 
         {/* Footer */}
