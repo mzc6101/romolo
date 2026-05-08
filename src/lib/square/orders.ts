@@ -15,6 +15,7 @@ export function buildOrderLineItems(
       catalogObjectId: l.catalogObjectId,
       quantity: String(l.quantity),
     };
+    if (l.uid) item.uid = l.uid;
     const modifierEntries: any[] = l.modifiers.map((m) => ({
       catalogObjectId: m,
     }));
@@ -32,14 +33,18 @@ export function buildOrderLineItems(
       // line item instead — no catalog_object_id, just name + base_price ×
       // count. The cannoli pricing rule targets the cannoli product set so
       // it skips this line, leaving the discount math untouched.
-      lineItems.push({
+      // Sibling uid suffixed with "-kit" so calculate's post-discount
+      // line totals can fold the fee back into the cart line's price.
+      const kitItem: any = {
         name: "Cannoli Kit",
         quantity: String(l.kitModifier.count),
         basePriceMoney: {
           amount: BigInt(l.kitModifier.perKitFeeCents),
           currency: "USD",
         },
-      });
+      };
+      if (l.uid) kitItem.uid = l.uid + "-kit";
+      lineItems.push(kitItem);
     }
   }
   return lineItems;

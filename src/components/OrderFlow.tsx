@@ -125,6 +125,11 @@ function buildLinePayload(line: OrderLine, snapshot: MenuSnapshot) {
       }
     : undefined;
   return {
+    // Threaded through to Square as line_item.uid so /api/orders/calculate
+    // can return a per-line post-discount total keyed by it. The same uid
+    // is reused on the kit-fee sibling line (suffixed "-kit") server-side
+    // so the cart row's displayed price folds in the kit fee.
+    uid: line.id,
     catalogObjectId: line.variationId,
     quantity: line.qty,
     modifiers: Object.values(line.modifiers).flat(),
@@ -405,6 +410,8 @@ export default function OrderFlow() {
   const [cardHandle, setCardHandle] = useState<SquareCardHandle | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const totals = useCalculatedTotals(order, snapshot);
+  const lineTotals = totals?.lineTotals ?? {};
 
   useEffect(() => {
     if (isOpen) {
@@ -538,9 +545,13 @@ export default function OrderFlow() {
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-7 sm:py-7">
           {step === 0 && <StepWhen order={order} setOrder={setOrder} />}
-          {step === 1 && <StepWhat order={order} setOrder={setOrder} />}
+          {step === 1 && (
+            <StepWhat order={order} setOrder={setOrder} lineTotals={lineTotals} />
+          )}
           {step === 2 && <StepHow order={order} />}
-          {step === 3 && <StepReview order={order} setOrder={setOrder} />}
+          {step === 3 && (
+            <StepReview order={order} setOrder={setOrder} lineTotals={lineTotals} />
+          )}
           {step === 4 && (
             <StepPay
               order={order}
@@ -555,7 +566,7 @@ export default function OrderFlow() {
         {/* Footer */}
         {step < 5 && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 sm:px-6 border-t border-romolo-border bg-romolo-cream">
-            <OrderSummary order={order} snapshot={snapshot} />
+            <OrderSummary totals={totals} />
             <div className="flex gap-2.5">
               {step > 0 && (
                 <button
@@ -854,9 +865,11 @@ function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => v
 function StepWhat({
   order,
   setOrder,
+  lineTotals,
 }: {
   order: Order;
   setOrder: (o: Order) => void;
+  lineTotals: Record<string, number>;
 }) {
   const { snapshot } = useOrder();
 
@@ -931,6 +944,7 @@ function StepWhat({
             index={idx}
             expanded={line.id === expandedId}
             onExpand={() => setExpandedId(line.id)}
+            lineTotalCents={lineTotals[line.id]}
           />
         ))}
       </div>
@@ -1042,6 +1056,7 @@ function OrderLineEditor({
   index,
   expanded,
   onExpand,
+  lineTotalCents,
 }: {
   line: OrderLine;
   onChange: (patch: Partial<OrderLine>) => void;
@@ -1049,6 +1064,10 @@ function OrderLineEditor({
   index: number;
   expanded: boolean;
   onExpand: () => void;
+  // Post-discount price for this cart line (cannoli line + kit fee, when
+  // applicable). Undefined while the calculate fetch is in flight or the
+  // line isn't valid enough to price yet.
+  lineTotalCents?: number;
 }) {
   const { snapshot } = useOrder();
   const item = snapshot.items.find((i) => i.id === line.itemId);
@@ -1100,19 +1119,26 @@ function OrderLineEditor({
             </span>
           )}
         </div>
-        {onRemove && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            aria-label="Remove"
-            className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5 shrink-0"
-          >
-            ✕
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {lineTotalCents != null && (
+            <span className="text-[14px] font-semibold tabular-nums text-romolo-charcoal">
+              {fmtCents(lineTotalCents)}
+            </span>
+          )}
+          {onRemove && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              aria-label="Remove"
+              className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -1292,6 +1318,11 @@ function OrderLineEditor({
                 onChange({ qty: item.kit ? v * item.kit.groupSize : v })
               }
             />
+          )}
+          {lineTotalCents != null && (
+            <span className="text-[14px] font-semibold tabular-nums text-romolo-charcoal">
+              {fmtCents(lineTotalCents)}
+            </span>
           )}
           {onRemove && (
             <button
@@ -1602,15 +1633,17 @@ function StepHow({ order }: { order: Order }) {
 // ─────────── Step 4: Review ───────────
 // Read-only cart summary right before payment. Per UX feedback the user can
 // only delete lines here — qty / filling / modifier edits stay on the What
-// step so the editor isn't duplicated. The footer's OrderSummary continues
-// to render the live Square-calculated totals (subtotal / discounts / kit
-// fee), so this body deliberately omits its own price column.
+// step so the editor isn't duplicated. Per-line post-discount prices come
+// from the Square calculate result so tier discounts are correctly
+// allocated across cannoli lines.
 function StepReview({
   order,
   setOrder,
+  lineTotals,
 }: {
   order: Order;
   setOrder: (o: Order) => void;
+  lineTotals: Record<string, number>;
 }) {
   const { snapshot } = useOrder();
   const removeLine = (id: string) =>
@@ -1672,13 +1705,20 @@ function StepReview({
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => removeLine(line.id)}
-                  aria-label="Remove"
-                  className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  {lineTotals[line.id] != null && (
+                    <span className="text-[15px] font-semibold tabular-nums text-romolo-charcoal">
+                      {fmtCents(lineTotals[line.id])}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => removeLine(line.id)}
+                    aria-label="Remove"
+                    className="text-romolo-warm-gray hover:text-romolo-red text-lg leading-none p-1.5 -m-1.5"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -1878,14 +1918,18 @@ type CalculatedTotals = {
   discountCents: number;
   totalCents: number;
   applied: Array<{ name: string; amountCents: number }>;
+  // Post-discount total per cart-line uid. Used by OrderLineEditor and
+  // StepReview to render an authoritative per-line price next to the ×
+  // (Square allocates tier discounts across lines, so the frontend can't
+  // recompute these locally).
+  lineTotals: Record<string, number>;
 };
 
-function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapshot }) {
-  // Server-side totals: only valid lines participate. Square (via
-  // /api/orders/calculate) is the authoritative source for subtotal,
-  // discounts, and grand total — the frontend never recomputes pricing
-  // logic. Last-known totals are kept across in-flight fetches so the
-  // footer doesn't blink while the user is mid-edit.
+// Lifted from OrderSummary so the calculate result powers per-line prices
+// in StepWhat and StepReview as well as the footer total — one round-trip
+// per state-change burst, no duplicated fetching. Last-known totals are
+// kept across in-flight fetches so the UI doesn't blink mid-edit.
+function useCalculatedTotals(order: Order, snapshot: MenuSnapshot): CalculatedTotals | null {
   const [totals, setTotals] = useState<CalculatedTotals | null>(null);
 
   const payloadKey = useMemo(() => {
@@ -1918,11 +1962,10 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
             discountCents: data.discountCents,
             totalCents: data.totalCents,
             applied: data.applied ?? [],
+            lineTotals: data.lineTotals ?? {},
           });
         }
-        // On non-ok responses we silently keep last-known totals; the user
-        // can still hit Continue and the place-order request will surface
-        // any real error inline.
+        // Non-ok: keep last-known totals; place-order surfaces real errors.
       } catch (e: any) {
         if (e?.name !== "AbortError") {
           // Network failure: keep last-known totals.
@@ -1935,8 +1978,11 @@ function OrderSummary({ order, snapshot }: { order: Order; snapshot: MenuSnapsho
     };
   }, [payloadKey]);
 
-  const totalCents = totals?.totalCents ?? 0;
+  return totals;
+}
 
+function OrderSummary({ totals }: { totals: CalculatedTotals | null }) {
+  const totalCents = totals?.totalCents ?? 0;
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
       <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>

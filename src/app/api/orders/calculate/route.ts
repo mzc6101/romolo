@@ -8,6 +8,9 @@ import { calculateOrderTotals } from "@/lib/square/calculate";
 // and stores nothing. Used by OrderSummary to keep the displayed total
 // aligned with what the place-order request will be charged.
 const lineSchema = z.object({
+  // See orders/route.ts — passed through to Square as line_item.uid so the
+  // calculate response can return per-line post-discount totals keyed by it.
+  uid: z.string().min(1).max(60).optional(),
   catalogObjectId: z.string().min(1),
   quantity: z.number().int().min(1).max(99),
   modifiers: z.array(z.string()),

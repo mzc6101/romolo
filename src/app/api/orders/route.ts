@@ -3,6 +3,11 @@ import { z } from "zod";
 import { createOrderAndPayment } from "@/lib/square/orders";
 
 const lineSchema = z.object({
+  // Stable cart-line id, threaded through Square as line_item.uid so
+  // /api/orders/calculate can return per-line post-discount totals keyed by
+  // it (see calculate.ts). Optional — older clients without per-line
+  // totals work fine without one.
+  uid: z.string().min(1).max(60).optional(),
   catalogObjectId: z.string().min(1),
   quantity: z.number().int().min(1).max(99),
   modifiers: z.array(z.string()),

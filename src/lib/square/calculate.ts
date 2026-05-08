@@ -21,6 +21,11 @@ export type CalculatedTotals = {
   discountCents: number;
   totalCents: number;
   applied: Array<{ name: string; amountCents: number }>;
+  // Post-discount total per cart-line uid. Cannoli + sibling kit-fee line
+  // are folded together (kit fee uid is the cart uid + "-kit"). Empty when
+  // the input lines were sent without uids — older callers still get
+  // order-level totals as before.
+  lineTotals: Record<string, number>;
 };
 
 export type CalculateResult =
@@ -37,12 +42,26 @@ export type CalculateResult =
 export function mapCalculatedOrder(order: any): CalculatedTotals {
   let subtotalCents = 0;
   let kitFeeCents = 0;
+  // Per-line post-discount totals keyed by cart-line uid. Strips the
+  // "-kit" suffix on the kit-fee sibling so its amount folds back into
+  // the parent cart line.
+  const lineTotals: Record<string, number> = {};
   for (const li of order.lineItems ?? []) {
     const gross = Number(li.grossSalesMoney?.amount ?? BigInt(0));
     if (li.catalogObjectId) {
       subtotalCents += gross;
     } else {
       kitFeeCents += gross;
+    }
+    const uid: string | undefined = li.uid;
+    if (uid) {
+      // totalMoney is the line's post-discount, post-tax amount — for our
+      // tax-free pickup orders that's exactly what the cart row should
+      // display. Falls back to gross when Square omits totalMoney (e.g.
+      // sandbox quirks for $0 lines).
+      const total = Number(li.totalMoney?.amount ?? BigInt(gross));
+      const cartUid = uid.endsWith("-kit") ? uid.slice(0, -"-kit".length) : uid;
+      lineTotals[cartUid] = (lineTotals[cartUid] ?? 0) + total;
     }
   }
   const discountCents = Number(order.totalDiscountMoney?.amount ?? BigInt(0));
@@ -62,7 +81,7 @@ export function mapCalculatedOrder(order: any): CalculatedTotals {
     amountCents,
   }));
 
-  return { subtotalCents, kitFeeCents, discountCents, totalCents, applied };
+  return { subtotalCents, kitFeeCents, discountCents, totalCents, applied, lineTotals };
 }
 
 export async function calculateOrderTotals(

@@ -159,6 +159,11 @@ export type OrderRequest = {
   // notes still attach to their respective line items separately.
   note?: string;
   lines: Array<{
+    // Stable per-cart-line id passed through to Square as line_item.uid so
+    // the calculate response can be joined back to cart lines for per-line
+    // post-discount totals (the cannoli line and its kit-fee sibling both
+    // carry uids derived from this — see buildOrderLineItems).
+    uid?: string;
     catalogObjectId: string;
     quantity: number;
     modifiers: string[];

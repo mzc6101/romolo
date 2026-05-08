@@ -17,7 +17,53 @@ describe("mapCalculatedOrder", () => {
       discountCents: 0,
       totalCents: 0,
       applied: [],
+      lineTotals: {},
     });
+  });
+
+  it("returns post-discount line totals keyed by uid, folding -kit sibling into the parent uid", () => {
+    const result = mapCalculatedOrder({
+      // 6 Full Cannoli @ $7 base, with a $0.50/ea tier discount → totalMoney
+      // per line is $39, plus a $2 kit fee. Sibling kit-fee uid suffix
+      // "-kit" should fold back into the parent cart uid.
+      totalMoney: usd(4100),
+      totalDiscountMoney: usd(300),
+      lineItems: [
+        {
+          uid: "abc123",
+          catalogObjectId: "VAR_RIC_FULL",
+          quantity: "6",
+          grossSalesMoney: usd(4200),
+          totalMoney: usd(3900),
+        },
+        {
+          uid: "abc123-kit",
+          name: "Cannoli Kit",
+          quantity: "1",
+          grossSalesMoney: usd(200),
+          totalMoney: usd(200),
+        },
+      ],
+      discounts: [{ uid: "D1", name: "Full 6+", appliedMoney: usd(300) }],
+    } as any);
+    expect(result.lineTotals).toEqual({ abc123: 4100 });
+  });
+
+  it("omits a uid from lineTotals when the input line had no uid", () => {
+    const result = mapCalculatedOrder({
+      totalMoney: usd(700),
+      totalDiscountMoney: usd(0),
+      lineItems: [
+        {
+          catalogObjectId: "V_X",
+          quantity: "1",
+          grossSalesMoney: usd(700),
+          totalMoney: usd(700),
+        },
+      ],
+      discounts: [],
+    } as any);
+    expect(result.lineTotals).toEqual({});
   });
 
   it("sums catalog-line gross sales into subtotal", () => {
