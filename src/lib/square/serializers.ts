@@ -107,7 +107,9 @@ function buildRegularComposite(
         ml.name !== options.multipleBoxesModifierListName,
     );
   const strip = (lists: SnapshotModifierList[]) =>
-    stripReservedModifierOptions(stripKitAndBoxes(lists), options.setReservedModifierNames);
+    forceSingleRicottaFilling(
+      stripReservedModifierOptions(stripKitAndBoxes(lists), options.setReservedModifierNames),
+    );
   return {
     id: options.compositeId,
     name: options.compositeName,
@@ -162,9 +164,11 @@ function buildKitComposite(
         ml.name !== options.multipleBoxesModifierListName
     );
   const strip = (lists: SnapshotModifierList[]) =>
-    stripReservedModifierOptions(
-      stripKitAndBoxes(lists),
-      options.setReservedModifierNames,
+    forceSingleRicottaFilling(
+      stripReservedModifierOptions(
+        stripKitAndBoxes(lists),
+        options.setReservedModifierNames,
+      ),
     );
   return {
     id: options.kitCompositeId,
@@ -194,6 +198,43 @@ function buildKitComposite(
       groupSize: options.kitGroupSize,
     },
   };
+}
+
+// Forces the Ricotta Filling list (suffix "filling") back to SINGLE/max=1
+// on the regular Cannoli + Cannoli Kit composites. Square's source list
+// allows MULTIPLE so the Cannoli Set composite can support multi-flavor
+// sets, but a single-cannoli line should still be one filling — the
+// frontend re-tightens the cap here. Ice Cream side has no list ending in
+// "filling" so the Ice Cream Flavor list is unaffected.
+function forceSingleRicottaFilling(
+  lists: SnapshotModifierList[],
+): SnapshotModifierList[] {
+  return lists.map((ml) => {
+    if (ml.modifierType !== "list") return ml;
+    const lc = ml.name.toLowerCase().trim();
+    if (!lc.endsWith("filling")) return ml;
+    if (ml.selectionType === "SINGLE" && ml.maxSelected === 1) return ml;
+    return { ...ml, selectionType: "SINGLE" as const, maxSelected: 1 };
+  });
+}
+
+// Inverse of forceSingleRicottaFilling — forces MULTIPLE/no-max on the
+// Ricotta Filling list for the Cannoli Set composite. Square's
+// per-attachment metadata for this list has historically been unreliable
+// in sandbox (the Set's saved selectionType/maxSelected don't always
+// round-trip), so the application asserts the multi-filling rule here.
+// Set lines should always allow picking multiple ricotta flavors;
+// regular and kit composites separately re-tighten to single.
+function forceMultiRicottaFilling(
+  lists: SnapshotModifierList[],
+): SnapshotModifierList[] {
+  return lists.map((ml) => {
+    if (ml.modifierType !== "list") return ml;
+    const lc = ml.name.toLowerCase().trim();
+    if (!lc.endsWith("filling")) return ml;
+    if (ml.selectionType === "MULTIPLE" && ml.maxSelected == null) return ml;
+    return { ...ml, selectionType: "MULTIPLE" as const, maxSelected: null };
+  });
 }
 
 // Filters reserved modifier OPTIONS (not lists) out of every list. Used so
@@ -371,7 +412,9 @@ function buildSetComposite(
       label: "Ricotta",
       squareItemId: ricotta.id,
       variations: ricotta.variations,
-      modifierLists: stripBoxesKitAndText(ricotta.modifierLists),
+      modifierLists: forceMultiRicottaFilling(
+        stripBoxesKitAndText(ricotta.modifierLists),
+      ),
     },
   ];
 

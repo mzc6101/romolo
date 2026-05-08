@@ -865,6 +865,70 @@ describe("mergeCannoliItems", () => {
       expect(shell.modifiers.map((m) => m.name)).toEqual(["Plain", "Chocolate"]);
     });
 
+    it("forces Ricotta Filling list to MULTIPLE/no-max on the Set composite — supports multi-flavor sets even when Square's per-attachment metadata reports SINGLE", () => {
+      // Source list as Square would send it on a fresh sandbox install:
+      // SINGLE / max=1 (or even per-attachment overrides). The Set composite
+      // must still allow multi-select — the rule is asserted in code so a
+      // glitchy per-attachment override can't break the set ordering flow.
+      const ricottaWithSingleFilling = setRicotta();
+      const filling = ricottaWithSingleFilling.modifierLists.find(
+        (ml) => ml.id === "ML_FILLING",
+      )!;
+      filling.selectionType = "SINGLE";
+      filling.maxSelected = 1;
+      const result = mergeCannoliItems(
+        [setIceCream(), ricottaWithSingleFilling],
+        options,
+      );
+      const set = result[2];
+      const setFilling = set
+        .cannoliFillings!.find((f) => f.key === "ricotta")!
+        .modifierLists.find((ml) => ml.id === "ML_FILLING")!;
+      expect(setFilling.selectionType).toBe("MULTIPLE");
+      expect(setFilling.maxSelected).toBeNull();
+      // Regular and kit composites retain the SINGLE override (this list was
+      // SINGLE on the source, so they pass through as SINGLE — and the
+      // forceSingleRicottaFilling call ensures it stays single regardless).
+      const regular = result[0];
+      const regFilling = regular
+        .cannoliFillings!.find((f) => f.key === "ricotta")!
+        .modifierLists.find((ml) => ml.id === "ML_FILLING")!;
+      expect(regFilling.selectionType).toBe("SINGLE");
+      expect(regFilling.maxSelected).toBe(1);
+    });
+
+    it("forces Ricotta Filling list back to SINGLE/max=1 on regular Cannoli + Kit composites when Square has it MULTIPLE", () => {
+      // Simulates the user enabling MULTIPLE on Cannoli Ricotta Filling so
+      // the Cannoli Set can support multi-flavor sets. The regular Cannoli
+      // and Cannoli Kit composites still need single-select per cannoli.
+      const ricottaWithMultiFilling = setRicotta();
+      const filling = ricottaWithMultiFilling.modifierLists.find(
+        (ml) => ml.id === "ML_FILLING",
+      )!;
+      filling.selectionType = "MULTIPLE";
+      filling.maxSelected = 5;
+      const result = mergeCannoliItems(
+        [setIceCream(), ricottaWithMultiFilling],
+        options,
+      );
+      const regular = result[0];
+      const kit = result[1];
+      const regFilling = regular
+        .cannoliFillings!.find((f) => f.key === "ricotta")!
+        .modifierLists.find((ml) => ml.id === "ML_FILLING")!;
+      const kitFilling = kit
+        .cannoliFillings!.find((f) => f.key === "ricotta")!
+        .modifierLists.find((ml) => ml.id === "ML_FILLING")!;
+      expect(regFilling.selectionType).toBe("SINGLE");
+      expect(regFilling.maxSelected).toBe(1);
+      expect(kitFilling.selectionType).toBe("SINGLE");
+      expect(kitFilling.maxSelected).toBe(1);
+      // And the source list is untouched (Set composite reads it for
+      // Customize mode and needs MULTIPLE preserved there).
+      expect(filling.selectionType).toBe("MULTIPLE");
+      expect(filling.maxSelected).toBe(5);
+    });
+
     it("does not emit the set composite when the Mixed garnish modifier is missing", () => {
       const ricotta = setRicotta();
       const garnish = ricotta.modifierLists.find((ml) => ml.id === "ML_GARNISH")!;
