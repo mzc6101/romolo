@@ -1,6 +1,6 @@
 export default function Heritage() {
   return (
-    <section id="heritage" className="relative py-24 md:py-36 bg-romolo-cream overflow-hidden">
+    <section id="heritage" className="relative py-24 md:py-28 xl:py-36 bg-romolo-cream overflow-hidden">
       {/* Aged B&W photographic backdrop */}
       <div
         aria-hidden
@@ -24,25 +24,25 @@ export default function Heritage() {
         }}
       />
       <div className="relative max-w-7xl mx-auto px-6 lg:px-10">
-        {/* Section header */}
-        <div className="mb-16 md:mb-24 animate-on-scroll">
-          <div className="flex items-center gap-6 mb-8">
+        {/* Section label */}
+        <div className="mb-12 md:mb-14 animate-on-scroll">
+          <div className="flex items-center gap-6">
             <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60" />
             <p className="text-base md:text-xl tracking-[0.3em] uppercase text-romolo-red font-medium">
               Our Heritage
             </p>
           </div>
-          <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
-            60 Years of
-            <br />
-            <span className="italic">Tradition</span>
-          </h2>
         </div>
 
         {/* Two-column layout */}
-        <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
-          {/* Heritage image */}
-          <div className="animate-on-scroll">
+        <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-start">
+          {/* Heritage title and image */}
+          <div className="animate-on-scroll space-y-10 md:space-y-12">
+            <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
+              60 Years of
+              <br />
+              <span className="italic">Tradition</span>
+            </h2>
             <img
               src="https://res.cloudinary.com/dhv6sobkv/image/upload/v1775679180/Nonni_cc9rny.avif"
               alt="Nonno Romolo in his original Sicilian pastry shop, circa 1965"
