@@ -115,8 +115,8 @@ const SET_AUTO_MODIFIERS = [
 const SET_OPTION_SPECS = [
   { key: "6_full", label: "6 Full Size", variationPrefix: "full", qty: 6 },
   { key: "12_full", label: "12 Full Size", variationPrefix: "full", qty: 12 },
-  { key: "12_mini", label: "12 Mini", variationPrefix: "mini", qty: 12 },
-  { key: "24_mini", label: "24 Mini", variationPrefix: "mini", qty: 24 },
+  { key: "12_mini", label: "12 Mini Size", variationPrefix: "mini", qty: 12 },
+  { key: "24_mini", label: "24 Mini Size", variationPrefix: "mini", qty: 24 },
 ] as const;
 // Modifier OPTION names that exist in Square but should NOT surface as user-
 // pickable choices on the regular Cannoli or Cannoli Kit composites — they
