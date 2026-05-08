@@ -697,7 +697,15 @@ function nowInTimezone(timezone: string): { dateIso: string; minutes: number } {
 function StepWhen({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
   const { snapshot } = useOrder();
   const today = new Date();
-  const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
+  // Local-date YYYY-MM-DD. toISOString() returns UTC, which shifts the date
+  // for users west of UTC during evening hours and breaks the weekday on
+  // round-trip through `new Date(date + "T00:00:00")` (Sun → stored as Mon).
+  const fmtDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
   const days = useMemo(() => {
     const arr: Date[] = [];
     for (let i = 0; i < 14; i++) {
