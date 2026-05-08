@@ -310,20 +310,38 @@ function buildSetComposite(
     return null;
   }
 
-  // Apply the multi-select override on the ricotta filling list when present
-  // (the list-name suffix matches "filling" on the ricotta side). Per-set
-  // configuration only — the regular Cannoli composite reads its own
-  // attachment of the same list and stays single-select.
+  // Per-set list overrides (regular Cannoli composite reads its own
+  // attachment of the same lists and is unaffected):
+  //   1) Ricotta Filling list: SINGLE → MULTIPLE, maxSelected → null. The
+  //      user has confirmed Square's saved per-attachment data is unreliable
+  //      in sandbox; intent is multi-select with no cap on the Set.
+  //   2) Conditionally-shown lists (Shell, Filling, Garnish for Ricotta;
+  //      Ice Cream Flavor for Ice Cream): bump minSelected to 1. Square
+  //      models them as optional, but visible ⇒ required in the UI per
+  //      product decision. activeModifierLists hides the wrong-bucket list
+  //      based on filling type, so the require-when-visible semantics come
+  //      from the standard min-selected check in lineValid.
+  const isConditionalListName = (lcName: string): boolean =>
+    options.ricottaOnlyListSuffixes.some((s) => lcName.endsWith(s)) ||
+    options.iceCreamOnlyListSuffixes.some((s) => lcName.endsWith(s));
   const overriddenLists = setItem.modifierLists.map((ml) => {
+    if (ml.modifierType !== "list") return ml;
     const lcName = norm(ml.name);
+    let next = ml;
     if (
-      ml.modifierType === "list" &&
       lcName.endsWith(options.setDefaults.ricottaFillingListSuffix) &&
       !lcName.includes("set filling") // don't override the filling-type list
     ) {
-      return { ...ml, selectionType: "MULTIPLE" as const, maxSelected: null };
+      next = { ...next, selectionType: "MULTIPLE" as const, maxSelected: null };
     }
-    return ml;
+    if (
+      next.id !== fillingTypeList.id &&
+      isConditionalListName(lcName) &&
+      next.minSelected < 1
+    ) {
+      next = { ...next, minSelected: 1 };
+    }
+    return next;
   });
 
   const ricottaOnlyListIds: string[] = [];

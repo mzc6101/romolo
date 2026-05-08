@@ -803,6 +803,49 @@ describe("mergeCannoliItems", () => {
       expect(filling.maxSelected).toBeNull();
     });
 
+    it("set composite forces minSelected=1 on conditional lists (Shell / Filling / Garnish / Ice Cream Flavor) — visible ⇒ required", () => {
+      const result = mergeCannoliItems(
+        [setIceCream(), setRicotta(), setOnline()],
+        options,
+      );
+      const set = result[2];
+      const byId = Object.fromEntries(set.modifierLists.map((m) => [m.id, m]));
+      expect(byId["ML_SHELL"].minSelected).toBe(1);
+      expect(byId["ML_FILLING"].minSelected).toBe(1);
+      expect(byId["ML_GARNISH"].minSelected).toBe(1);
+      expect(byId["ML_IC_FLAVOR"].minSelected).toBe(1);
+      // Filling-type list itself was already min=1 in Square; unchanged.
+      expect(byId["ML_SET_FILLING_TYPE"].minSelected).toBe(1);
+      // Non-conditional lists keep their Square-defined min (Multiple Boxes
+      // and Special Notes are optional everywhere).
+      expect(byId["ML_SET_BOXES"].minSelected).toBe(0);
+      expect(byId["ML_NOTES"].minSelected).toBe(0);
+    });
+
+    it("set composite min override does not leak to the regular Ricotta source item's modifier lists", () => {
+      const ric = setRicotta();
+      const result = mergeCannoliItems(
+        [setIceCream(), ric, setOnline()],
+        options,
+      );
+      // Source item's own list objects must keep Square's optional min — the
+      // regular Cannoli composite reads them, and they should stay optional
+      // there.
+      const sourceShell = ric.modifierLists.find((m) => m.id === "ML_SHELL")!;
+      const sourceFilling = ric.modifierLists.find((m) => m.id === "ML_FILLING")!;
+      const sourceGarnish = ric.modifierLists.find((m) => m.id === "ML_GARNISH")!;
+      expect(sourceShell.minSelected).toBe(0);
+      expect(sourceFilling.minSelected).toBe(0);
+      expect(sourceGarnish.minSelected).toBe(0);
+      // And the regular composite produced from those lists is also optional.
+      const regular = result[0];
+      const ricFilling = regular.cannoliFillings!.find(
+        (f) => f.key === "ricotta",
+      )!;
+      const regShell = ricFilling.modifierLists.find((m) => m.id === "ML_SHELL")!;
+      expect(regShell.minSelected).toBe(0);
+    });
+
     it("set composite carries the new Set item's modifier lists (Filling Type, Shell, Filling, Garnish, Ice Cream Flavor, Multiple Boxes, Special Notes)", () => {
       const result = mergeCannoliItems(
         [setIceCream(), setRicotta(), setOnline()],
