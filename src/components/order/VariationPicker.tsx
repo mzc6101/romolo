@@ -9,10 +9,15 @@ export function VariationPicker({
   variations,
   selectedId,
   onSelect,
+  hidePrice,
 }: {
   variations: SnapshotVariation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // Suppress the per-chip "· $X.YY" suffix. Used for items with tiered
+  // pricing (Cannoli) where a single chip price is misleading; the caller
+  // renders a separate tier breakdown alongside the picker.
+  hidePrice?: boolean;
 }) {
   if (variations.length === 0) return null;
   const picked = variations.find((v) => v.id === selectedId);
@@ -40,7 +45,7 @@ export function VariationPicker({
                   : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
               }`}
             >
-              {v.name} · {fmt(v.priceCents)}
+              {hidePrice ? v.name : `${v.name} · ${fmt(v.priceCents)}`}
               {disabled && <span className="text-[10px]">sold out</span>}
             </button>
           );

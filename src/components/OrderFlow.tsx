@@ -1070,9 +1070,11 @@ function OrderLineEditor({
   if (!expanded) {
     // Set items already encode their qty in the size label (6 / 12 / 24)
     // surfaced via summarizeLine, so we suppress "× N" there to avoid
-    // double-counting. Everything else gets the qty inline.
+    // double-counting. Kit lines display as kit-count (1, 2, 3) instead of
+    // cannoli-count (6, 12, 18) — line.qty is still cannoli units internally.
+    const displayQty = item?.kit ? line.qty / item.kit.groupSize : line.qty;
     const headline = item
-      ? `${item.name}${!item.set ? ` × ${line.qty}` : ""}`
+      ? `${item.name}${!item.set ? ` × ${displayQty}` : ""}`
       : `Item ${index + 1} — pick something`;
     const summary = item ? summarizeLine(line, item) : "";
     return (
@@ -1283,10 +1285,12 @@ function OrderLineEditor({
               would be misleading. */}
           {!item.set && (
             <QtyStepper
-              qty={line.qty}
-              step={item.kit ? item.kit.groupSize : 1}
-              min={item.kit ? item.kit.groupSize : 1}
-              onChange={(v) => onChange({ qty: v })}
+              qty={item.kit ? line.qty / item.kit.groupSize : line.qty}
+              step={1}
+              min={1}
+              onChange={(v) =>
+                onChange({ qty: item.kit ? v * item.kit.groupSize : v })
+              }
             />
           )}
           {onRemove && (
@@ -1303,6 +1307,12 @@ function OrderLineEditor({
 
       {item.description && (
         <div className="text-[13px] text-romolo-warm-gray mb-3">{item.description}</div>
+      )}
+
+      {item.kit && (
+        <div className="text-[12px] italic text-romolo-warm-gray mb-3">
+          Kit comes in multiples of {item.kit.groupSize} cannoli.
+        </div>
       )}
 
       {item.cannoliFillings && !item.set && (
@@ -1431,13 +1441,42 @@ function OrderLineEditor({
         </div>
       )}
 
-      {variations.length > 1 && (
-        <VariationPicker
-          variations={variations}
-          selectedId={line.variationId}
-          onSelect={(id) => onChange({ variationId: id })}
-        />
-      )}
+      {variations.length > 1 && (() => {
+        // Cannoli composite has tiered Square pricing rules (the per-chip
+        // price would be misleading since the actual unit price drops as
+        // qty rises). Hide the chip price and surface the tier breakdown
+        // for the currently picked size as a small italic note below.
+        // Tier values mirror the AUTOMATIC pricing rules in Square; if
+        // those change, update them here too.
+        const isCannoli =
+          !!item.cannoliFillings && !item.kit && !item.set;
+        const picked = variations.find((v) => v.id === line.variationId);
+        const tierNote = (() => {
+          if (!isCannoli || !picked) return null;
+          if (/full/i.test(picked.name)) {
+            return "1–5: $7.00 · 6–11: $6.50 · 12+: $6.00";
+          }
+          if (/mini/i.test(picked.name)) {
+            return "1–23: $4.00 · 24+: $3.50";
+          }
+          return null;
+        })();
+        return (
+          <>
+            <VariationPicker
+              variations={variations}
+              selectedId={line.variationId}
+              onSelect={(id) => onChange({ variationId: id })}
+              hidePrice={isCannoli}
+            />
+            {tierNote && (
+              <div className="-mt-2 mb-4 text-[12px] italic text-romolo-warm-gray">
+                {tierNote}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {orderedModifierLists.map((ml) => (
         <ModifierSet
@@ -1623,7 +1662,9 @@ function StepReview({
                 <div className="flex-1 min-w-0">
                   <div className="font-[var(--font-serif)] text-[18px] text-romolo-charcoal">
                     {item.name}
-                    {!item.set ? ` × ${line.qty}` : ""}
+                    {!item.set
+                      ? ` × ${item.kit ? line.qty / item.kit.groupSize : line.qty}`
+                      : ""}
                   </div>
                   {summary && (
                     <div className="text-[12px] text-romolo-warm-gray mt-0.5">
