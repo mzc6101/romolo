@@ -1839,7 +1839,11 @@ function StepHow({ order, setOrder }: { order: Order; setOrder: (o: Order) => vo
           <button
             key={f}
             type="button"
-            onClick={() => setOrder({ ...order, fulfillment: f })}
+            onClick={() => setOrder({
+              ...order,
+              fulfillment: f,
+              ...(f === "delivery" ? { paymentMethod: "pickup" as const } : {}),
+            })}
             className={`py-3.5 rounded-sm text-[13px] font-semibold tracking-[0.08em] uppercase transition-all border ${
               order.fulfillment === f
                 ? "bg-romolo-charcoal text-white border-romolo-charcoal"
@@ -2126,22 +2130,28 @@ function StepPay({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5 mb-6">
-        {(["card", "pickup"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setOrder({ ...order, paymentMethod: m })}
-            className={`py-3.5 rounded-sm text-[13px] font-semibold tracking-[0.08em] uppercase transition-all border ${
-              order.paymentMethod === m
-                ? "bg-romolo-charcoal text-white border-romolo-charcoal"
-                : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
-            }`}
-          >
-            {m === "card" ? "Pay now" : "Pay at pickup"}
-          </button>
-        ))}
-      </div>
+      {order.fulfillment === "delivery" ? (
+        <div className="mb-6 px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-[13px] text-romolo-warm-gray">
+          Delivery orders are paid when we arrive. We&apos;ll call to confirm.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5 mb-6">
+          {(["card", "pickup"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setOrder({ ...order, paymentMethod: m })}
+              className={`py-3.5 rounded-sm text-[13px] font-semibold tracking-[0.08em] uppercase transition-all border ${
+                order.paymentMethod === m
+                  ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                  : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
+              }`}
+            >
+              {m === "card" ? "Pay now" : "Pay at pickup"}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2.5 mb-5">
         <input
