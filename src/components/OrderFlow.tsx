@@ -196,10 +196,11 @@ type Order = {
   time: string;
   timeAvailable: boolean;
   lines: OrderLine[];
-  fulfillment: "pickup";
+  fulfillment: "pickup" | "delivery";
+  deliveryAddress: string;
+  deliveryPhone: string;
+  paymentMethod: "card" | "pickup";
   contact: Contact;
-  // Order-level note entered on the Review step. Sent to Square as
-  // order.note (top-level, separate from per-line freeText/notes).
   note: string;
   confirmation: string;
 };
@@ -282,6 +283,9 @@ const initialOrder = (): Order => ({
   timeAvailable: true,
   lines: [],
   fulfillment: "pickup",
+  deliveryAddress: "",
+  deliveryPhone: "",
+  paymentMethod: "card",
   contact: { name: "", phone: "", email: "" },
   note: "",
   confirmation: "",
@@ -312,7 +316,17 @@ function loadPersistedCart(): PersistedCart | null {
     ) {
       return null;
     }
-    return parsed;
+    const o = parsed.order as any;
+    return {
+      step: parsed.step,
+      order: {
+        ...parsed.order,
+        fulfillment: o.fulfillment || "pickup",
+        deliveryAddress: o.deliveryAddress || "",
+        deliveryPhone: o.deliveryPhone || "",
+        paymentMethod: o.paymentMethod || "card",
+      },
+    };
   } catch {
     return null;
   }
@@ -541,15 +555,20 @@ export default function OrderFlow() {
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const placeOrder = async () => {
-    if (!cardHandle || submitting) return;
+    if (order.paymentMethod === "card" && !cardHandle) return;
+    if (submitting) return;
     setSubmitting(true);
     setErrorBanner(null);
 
-    const tokenResult = await cardHandle.tokenize();
-    if ("error" in tokenResult) {
-      setErrorBanner(tokenResult.error);
-      setSubmitting(false);
-      return;
+    let sourceId: string | undefined;
+    if (order.paymentMethod === "card") {
+      const tokenResult = await cardHandle!.tokenize();
+      if ("error" in tokenResult) {
+        setErrorBanner(tokenResult.error);
+        setSubmitting(false);
+        return;
+      }
+      sourceId = tokenResult.token;
     }
 
     // Anchor to the shop's tz (from snapshot.hours.timezone) instead of the
@@ -568,16 +587,29 @@ export default function OrderFlow() {
     // instead of charging a new card.
     const idempotencyKey = crypto.randomUUID();
 
+    const noteParts: string[] = [];
+    if (order.fulfillment === "delivery") {
+      noteParts.push(`DELIVERY — ${order.deliveryAddress.trim()} — ${order.deliveryPhone.trim()}`);
+    }
+    if (order.paymentMethod === "pickup") {
+      noteParts.push("PAY AT PICKUP");
+    }
+    if (order.note.trim()) {
+      noteParts.push(order.note.trim());
+    }
+    const finalNote = noteParts.join("\n") || undefined;
+
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         idempotencyKey,
-        sourceId: tokenResult.token,
+        ...(sourceId ? { sourceId } : {}),
+        ...(order.paymentMethod === "pickup" ? { payAtPickup: true } : {}),
         pickupAt,
         contact: order.contact,
         lines: order.lines.map((l) => buildLinePayload(l, snapshot)),
-        ...(order.note.trim() ? { note: order.note.trim() } : {}),
+        ...(finalNote ? { note: finalNote } : {}),
       }),
     });
 
@@ -609,18 +641,23 @@ export default function OrderFlow() {
         order.lines.length > 0 &&
         order.lines.every((l) => lineValid(l, snapshot))
       );
-    if (step === 2) return order.fulfillment === "pickup";
+    if (step === 2) {
+      if (order.fulfillment === "delivery") {
+        return order.deliveryAddress.trim().length > 0 && order.deliveryPhone.trim().length > 0;
+      }
+      return true;
+    }
     if (step === 3)
       return (
         order.lines.length > 0 &&
         order.lines.every((l) => lineValid(l, snapshot))
       );
-    if (step === 4)
-      return (
-        !!cardHandle &&
-        !!order.contact.email &&
-        !!order.contact.name
-      );
+    if (step === 4) {
+      if (order.paymentMethod === "pickup") {
+        return !!order.contact.email && !!order.contact.name && !!order.contact.phone;
+      }
+      return !!cardHandle && !!order.contact.email && !!order.contact.name;
+    }
     return false;
   })();
 
@@ -670,7 +707,7 @@ export default function OrderFlow() {
           {step === 1 && (
             <StepWhat order={order} setOrder={setOrder} lineTotals={lineTotals} />
           )}
-          {step === 2 && <StepHow order={order} />}
+          {step === 2 && <StepHow order={order} setOrder={setOrder} />}
           {step === 3 && (
             <StepReview order={order} setOrder={setOrder} lineTotals={lineTotals} />
           )}
@@ -1778,11 +1815,8 @@ function QtyStepper({
 }
 
 // ─────────── Step 3: How ───────────
-function StepHow({ order }: { order: Order }) {
+function StepHow({ order, setOrder }: { order: Order; setOrder: (o: Order) => void }) {
   const { snapshot } = useOrder();
-  // Square is the source of truth for the storefront address. Fall back to
-  // the legacy hardcoded line if the snapshot couldn't load location data —
-  // the empty-snapshot path returns "" for both fields.
   const address =
     snapshot.location.address || "81 W. 37th Ave, San Mateo CA 94403";
   const directionsHref = snapshot.location.mapsQuery
@@ -1793,40 +1827,85 @@ function StepHow({ order }: { order: Order }) {
     <div>
       <StepHeader
         title="How do you want it?"
-        subtitle="Pickup at the shop. Walk in, give your name, the cannoli are filled while you watch."
+        subtitle={
+          order.fulfillment === "delivery"
+            ? "Enter your address and phone. We’ll call to confirm and coordinate."
+            : "Pickup at the shop. Walk in, give your name, the cannoli are filled while you watch."
+        }
       />
 
-      <div className="p-5 bg-romolo-cream border border-romolo-border rounded-sm">
-        <div className="text-[28px] mb-2">🛍️</div>
-        <div className="font-[var(--font-serif)] text-[22px] font-medium mb-1.5">
-          {address}
-        </div>
-        <div className="text-[13px] text-romolo-warm-gray leading-relaxed mb-3">
-          Look for the red awning. Free street parking out front.
-        </div>
-        <div className="text-[13px] text-romolo-charcoal">
-          <strong>Pickup window:</strong>{" "}
-          {order.date && order.time ? `${order.date} at ${order.time}` : "—"}
-        </div>
-        {directionsHref && (
-          <a
-            href={directionsHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 text-[12px] font-bold tracking-[0.15em] uppercase border border-romolo-border bg-white text-romolo-charcoal hover:border-romolo-red hover:text-romolo-red transition-colors rounded-sm"
+      <div className="grid grid-cols-2 gap-2.5 mb-6">
+        {(["pickup", "delivery"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setOrder({ ...order, fulfillment: f })}
+            className={`py-3.5 rounded-sm text-[13px] font-semibold tracking-[0.08em] uppercase transition-all border ${
+              order.fulfillment === f
+                ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
+            }`}
           >
-            Get directions →
-          </a>
-        )}
+            {f === "pickup" ? "Pickup" : "Delivery"}
+          </button>
+        ))}
       </div>
 
-      <p className="text-xs text-romolo-warm-gray mt-4 italic">
-        Need delivery for an event? Call us at{" "}
-        <a href="tel:+16505740625" className="text-romolo-red underline">
-          (650) 574-0625
-        </a>
-        .
-      </p>
+      {order.fulfillment === "pickup" ? (
+        <div className="p-5 bg-romolo-cream border border-romolo-border rounded-sm">
+          <div className="text-[28px] mb-2">🛍️</div>
+          <div className="font-[var(--font-serif)] text-[22px] font-medium mb-1.5">
+            {address}
+          </div>
+          <div className="text-[13px] text-romolo-warm-gray leading-relaxed mb-3">
+            Look for the red awning. Free street parking out front.
+          </div>
+          <div className="text-[13px] text-romolo-charcoal">
+            <strong>Pickup window:</strong>{" "}
+            {order.date && order.time ? `${order.date} at ${order.time}` : "—"}
+          </div>
+          {directionsHref && (
+            <a
+              href={directionsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 text-[12px] font-bold tracking-[0.15em] uppercase border border-romolo-border bg-white text-romolo-charcoal hover:border-romolo-red hover:text-romolo-red transition-colors rounded-sm"
+            >
+              Get directions →
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+              Delivery address
+            </label>
+            <input
+              type="text"
+              placeholder="123 Main St, San Mateo CA 94401"
+              value={order.deliveryAddress}
+              onChange={(e) => setOrder({ ...order, deliveryAddress: e.target.value })}
+              className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal placeholder:text-romolo-warm-gray/50 focus:outline-none focus:border-romolo-red/40 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+              Phone number
+            </label>
+            <input
+              type="tel"
+              placeholder="(650) 555-1234"
+              value={order.deliveryPhone}
+              onChange={(e) => setOrder({ ...order, deliveryPhone: e.target.value })}
+              className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal placeholder:text-romolo-warm-gray/50 focus:outline-none focus:border-romolo-red/40 transition-colors"
+            />
+          </div>
+          <p className="text-xs text-romolo-warm-gray italic pt-1">
+            We&apos;ll call this number to confirm delivery details and take payment.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1866,14 +1945,23 @@ function StepReview({
 
       <div className="p-4 bg-romolo-cream border border-romolo-border rounded-sm mb-5">
         <div className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
-          Pickup
+          {order.fulfillment === "delivery" ? "Delivery" : "Pickup"}
         </div>
         <div className="font-[var(--font-serif)] text-[20px] font-medium text-romolo-charcoal">
           {prettyDate(order.date)} · {order.time}
         </div>
-        {snapshot.location.address && (
+        {order.fulfillment === "delivery" ? (
+          <div className="text-[13px] text-romolo-warm-gray mt-1">
+            {order.deliveryAddress} · {order.deliveryPhone}
+          </div>
+        ) : snapshot.location.address ? (
           <div className="text-[13px] text-romolo-warm-gray mt-1">
             {snapshot.location.address}
+          </div>
+        ) : null}
+        {order.paymentMethod === "pickup" && (
+          <div className="text-[12px] font-semibold text-romolo-red mt-2">
+            Pay at pickup
           </div>
         )}
       </div>
@@ -2019,7 +2107,11 @@ function StepPay({
     <div>
       <StepHeader
         title="How would you like to pay?"
-        subtitle="Secure checkout via Square. We don't store your card."
+        subtitle={
+          order.paymentMethod === "pickup"
+            ? "We'll prepare your order — pay when you arrive."
+            : "Secure checkout via Square. We don't store your card."
+        }
       />
       {errorBanner && (
         <div
@@ -2033,6 +2125,24 @@ function StepPay({
           {errorBanner}
         </div>
       )}
+
+      <div className="grid grid-cols-2 gap-2.5 mb-6">
+        {(["card", "pickup"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setOrder({ ...order, paymentMethod: m })}
+            className={`py-3.5 rounded-sm text-[13px] font-semibold tracking-[0.08em] uppercase transition-all border ${
+              order.paymentMethod === m
+                ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
+            }`}
+          >
+            {m === "card" ? "Pay now" : "Pay at pickup"}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-2 gap-2.5 mb-5">
         <input
           className="px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
@@ -2061,10 +2171,14 @@ function StepPay({
         }
       />
 
-      <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
-        Card details
-      </h5>
-      <SquareCard onReady={(h) => setCardHandle(h)} />
+      {order.paymentMethod === "card" && (
+        <>
+          <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+            Card details
+          </h5>
+          <SquareCard onReady={(h) => setCardHandle(h)} />
+        </>
+      )}
     </div>
   );
 }
@@ -2115,16 +2229,28 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
       </h3>
       <p className="text-romolo-warm-gray mb-5">
         Order{" "}
-        <strong className="text-romolo-charcoal">{order.confirmation}</strong> is in. We&apos;ll email{" "}
-        {order.contact.email || "you"}{" "}when it&apos;s ready to pick up.
+        <strong className="text-romolo-charcoal">{order.confirmation}</strong> is in.{" "}
+        {order.fulfillment === "delivery"
+          ? "We'll call you to confirm delivery details."
+          : `We'll email ${order.contact.email || "you"} when it's ready to pick up.`}
       </p>
       <div className="bg-romolo-cream border border-romolo-border rounded-sm p-4 text-left mb-5">
         <div className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
-          Pickup
+          {order.fulfillment === "delivery" ? "Delivery" : "Pickup"}
         </div>
         <div className="font-semibold">
           {prettyDate(order.date)} · {order.time}
         </div>
+        {order.fulfillment === "delivery" && order.deliveryAddress && (
+          <div className="text-[13px] text-romolo-warm-gray mt-1">
+            {order.deliveryAddress}
+          </div>
+        )}
+        {order.paymentMethod === "pickup" && (
+          <div className="text-[12px] font-semibold text-romolo-red mt-2">
+            Pay when you arrive
+          </div>
+        )}
       </div>
       <button
         className="px-7 py-3 text-[12px] font-bold tracking-[0.15em] uppercase bg-romolo-red text-white hover:bg-romolo-red-dark transition-colors rounded-sm"

@@ -88,7 +88,7 @@ export const MENU_DATA: MenuCategory[] = [
         description: "Crispy shell filled to order with sweet ricotta",
         price: 4.5,
         imageUrl:
-          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679870/_N8Z0944_odj3da.jpg",
+          "https://res.cloudinary.com/dcthz84ws/image/upload/q_auto/f_auto/v1777914813/_N8Z0653_lb1e3o.jpg",
         galleryUrls: [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679870/_N8Z0944_odj3da.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775678635/_N8Z0762_bsvral.jpg",
@@ -280,7 +280,7 @@ export const REVIEWS: Review[] = [
     avatar: "MC",
     rating: 5,
     date: "2 weeks ago",
-    text: "The best cannoli I've ever had outside of Sicily. That shell — my God — it shatters like a dream. Romolo's is the real deal. Joey filled mine while I watched and the ricotta was so fresh.",
+    text: "The best cannoli I've ever had outside of Sicily. That shell — my God — it shatters like a dream. Romolo's is the real deal. Joe filled mine while I watched and the ricotta was so fresh.",
   },
   {
     source: "yelp",

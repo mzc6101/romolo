@@ -174,7 +174,8 @@ export type OrderResult =
 
 export type OrderRequest = {
   idempotencyKey: string;
-  sourceId: string;
+  sourceId?: string;
+  payAtPickup?: boolean;
   pickupAt: string;
   contact: { name: string; phone: string; email: string };
   // Order-level customer note (entered on the Review step). Threads through

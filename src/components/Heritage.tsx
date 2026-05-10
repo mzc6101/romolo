@@ -56,34 +56,34 @@ export default function Heritage() {
               1968
             </span>
             <h3 className="font-[var(--font-serif)] text-2xl md:text-3xl font-light text-romolo-charcoal mb-6 leading-snug">
-              From a Sicilian village kitchen
+              From a Sicilian kitchen
               <br className="hidden md:block" />
-              to a corner shop in San Mateo.
+              to a shop in San Mateo.
             </h3>
             <div className="space-y-5 text-romolo-warm-gray leading-relaxed">
               <p>
                 Romolo &amp; Angela made desserts at home in Vittoria, Sicily.
                 When they came to the Bay Area in the 1960s, they bought a
                 Swensen&apos;s Ice Cream Parlor, and Romolo&apos;s Cannoli took
-                shape as both gelateria and pasticceria, showcasing
-                Italian specialties like spumoni, amaretti, and cannoli, alongside
-                almond and hazelnut, and eventually ice cream cakes, tiramisu,
-                cookies, and our famous cannoli.
+                shape as both gelateria and pasticceria. The couple showcased
+                Italian specialties like spumoni, amaretti, tiramisu and their
+                famous cannoli.
               </p>
               <p>
-                As bakeries in the Bay Area started closing, Romolo&apos;s
-                quickly became the go-to for an authentic Sicilian-Italian
-                gelateria and pasticceria. In 2007, Romolo and Angela retired and
-                handed their masterpiece to their grandson Joey. The
-                creativeness of Joey helped mix tradition with current demands.
+                As Italian bakeries in the Bay Area close, Romolo&apos;s became
+                the go-to maker for authentic cannoli like you&apos;d find in
+                New York, Boston and Chicago. In 2007, Romolo and Angela retired
+                and handed their masterpiece to their grandson Joe, who
+                creatively kept the tradition while meeting current demands.
               </p>
               <p>
-                Sixty years later, the grandkids make everything the same
-                way, filled to order from the best ingredients available. Today we
-                offer cannoli kits, pistachios, chocolate chips and toffee garnish,
-                alternative fillings like lemon, chocolate, pistachio and
-                hazelnut, and company catering delivered every day throughout
-                the Bay Area in our electric cars.
+                Sixty years later, Romolo&apos;s Cannoli makes everything the
+                same way, filled to order from the best ingredients available.
+                We offer cannoli kits to fill at home, pistachios, chocolate
+                chips and toffee garnish, and alternative ricotta fillings like
+                lemoncello, chocolate, tiramisu and strawberry. We supply
+                cannoli to restaurants, and deliver every day throughout the
+                Bay Area.
               </p>
             </div>
 

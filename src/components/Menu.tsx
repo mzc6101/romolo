@@ -23,7 +23,7 @@ export default function Menu() {
             </p>
           </div>
           <h2 className="font-[var(--font-serif)] text-5xl md:text-6xl lg:text-7xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em]">
-            What we <span className="italic">offer</span>
+            How to <span className="italic">order</span>
           </h2>
           <p className="mt-10 max-w-2xl text-[17px] text-romolo-warm-gray leading-relaxed">
             A rotating selection of cannoli, dolci, and gelato — made fresh each morning. For today&apos;s live menu, prices, and pickup times,{" "}
@@ -68,7 +68,7 @@ export default function Menu() {
                           src={item.imageUrl}
                           alt=""
                           fill
-                          className="object-cover transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-[1.05]"
+                          className="object-cover scale-[1.2] transition-transform duration-700 ease-[var(--ease-out-expo)] group-hover:scale-[1.25]"
                           sizes="(min-width: 1024px) 26vw, (min-width: 768px) 32vw, 48vw"
                         />
                       ) : (
@@ -102,6 +102,73 @@ export default function Menu() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* How to Order — step-by-step visual guide */}
+        <div className="mt-28 md:mt-36 animate-on-scroll">
+          <div className="flex items-center gap-6 mb-8">
+            <span aria-hidden className="block h-px w-16 md:w-24 bg-romolo-red/60" />
+            <p className="text-base md:text-xl tracking-[0.3em] uppercase text-romolo-red font-medium">
+              Build Your Cannoli
+            </p>
+          </div>
+          <h3 className="font-[var(--font-serif)] text-4xl md:text-5xl lg:text-6xl font-light text-romolo-charcoal leading-[0.95] tracking-[-0.01em] mb-6">
+            Four <span className="italic">choices</span>
+          </h3>
+          <p className="max-w-2xl text-[17px] text-romolo-warm-gray leading-relaxed mb-14">
+            Every cannoli is made to order. Pick your size, shell, filling, and garnish — we fill it fresh while you watch.
+          </p>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6">
+            {[
+              {
+                step: 1,
+                label: "Pick your size",
+                choices: ["Full Size", "Mini", "Kit (6-pack)"],
+              },
+              {
+                step: 2,
+                label: "Choose your shell",
+                choices: ["Chocolate", "Plain"],
+              },
+              {
+                step: 3,
+                label: "Pick your filling",
+                choices: ["Original Ricotta", "Chocolate", "Tiramisu", "Pistachio", "Lemon Cello", "Strawberry"],
+              },
+              {
+                step: 4,
+                label: "Add a garnish",
+                choices: ["Pistachio", "Chocolate Chips", "Toffee", "Cherries"],
+              },
+            ].map((s) => (
+              <div key={s.step} className="animate-on-scroll">
+                <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border mb-5 flex items-center justify-center">
+                  <span className="font-[var(--font-serif)] text-6xl font-light text-romolo-border">
+                    {s.step}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-3 mb-2">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-romolo-red text-white text-[13px] font-bold shrink-0">
+                    {s.step}
+                  </span>
+                  <h4 className="font-[var(--font-serif)] text-xl md:text-2xl font-medium text-romolo-charcoal m-0">
+                    {s.label}
+                  </h4>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {s.choices.map((c) => (
+                    <span
+                      key={c}
+                      className="px-3 py-1.5 text-[12px] text-romolo-warm-gray border border-romolo-border rounded-full"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>

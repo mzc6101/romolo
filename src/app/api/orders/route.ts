@@ -27,18 +27,20 @@ const lineSchema = z.object({
 
 const bodySchema = z.object({
   idempotencyKey: z.string().min(1).max(64),
-  sourceId: z.string().min(1),
+  sourceId: z.string().min(1).optional(),
+  payAtPickup: z.boolean().optional(),
   pickupAt: z.string().datetime(),
   contact: z.object({
     name: z.string().min(1).max(100),
     phone: z.string().min(1).max(40),
     email: z.string().email(),
   }),
-  // Order-level customer note. Square's order.note caps at 500 chars; we
-  // mirror that here so the client and Square agree on the upper bound.
   note: z.string().max(500).optional(),
   lines: z.array(lineSchema).min(1),
-});
+}).refine(
+  (d) => d.payAtPickup || (d.sourceId && d.sourceId.length > 0),
+  { message: "sourceId is required when not paying at pickup", path: ["sourceId"] },
+);
 
 export async function POST(req: Request) {
   let body: unknown;

@@ -116,21 +116,43 @@ export async function createOrderAndPayment(
   }
 
   try {
-    const { payment } = await client.payments.create({
-      sourceId: req.sourceId,
-      idempotencyKey: req.idempotencyKey + "-pay",
-      amountMoney: { amount: totalAmount, currency: "USD" },
-      locationId,
-      orderId,
-      autocomplete: true,
-      buyerEmailAddress: req.contact.email,
-    });
-    if (!payment?.id) {
-      return {
-        status: "square_error",
-        code: "PAYMENT_INVALID",
-        message: "Payment did not return an id.",
-      };
+    if (req.payAtPickup) {
+      const { payment } = await client.payments.create({
+        sourceId: "EXTERNAL",
+        idempotencyKey: req.idempotencyKey + "-pay",
+        amountMoney: { amount: totalAmount, currency: "USD" },
+        locationId,
+        orderId,
+        autocomplete: true,
+        externalDetails: {
+          type: "OTHER" as const,
+          source: "Pay at Pickup",
+        },
+      } as any);
+      if (!payment?.id) {
+        return {
+          status: "square_error",
+          code: "PAYMENT_INVALID",
+          message: "Payment did not return an id.",
+        };
+      }
+    } else {
+      const { payment } = await client.payments.create({
+        sourceId: req.sourceId!,
+        idempotencyKey: req.idempotencyKey + "-pay",
+        amountMoney: { amount: totalAmount, currency: "USD" },
+        locationId,
+        orderId,
+        autocomplete: true,
+        buyerEmailAddress: req.contact.email,
+      });
+      if (!payment?.id) {
+        return {
+          status: "square_error",
+          code: "PAYMENT_INVALID",
+          message: "Payment did not return an id.",
+        };
+      }
     }
   } catch (err: any) {
     return mapSquareError(err);
