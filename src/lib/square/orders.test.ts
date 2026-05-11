@@ -82,6 +82,26 @@ describe("buildOrderPayload", () => {
     expect((payload.order.lineItems![0] as any).note).toBeUndefined();
   });
 
+  it("emits DELIVERY fulfillment with deliveryDetails when fulfillment is delivery", () => {
+    const payload = buildOrderPayload(
+      { ...baseRequest, fulfillment: "delivery", note: "Apt 4B" },
+      "LOC_TEST"
+    );
+    expect(payload.order.fulfillments).toHaveLength(1);
+    const f = payload.order.fulfillments![0];
+    expect(f.type).toBe("DELIVERY");
+    expect((f as any).deliveryDetails.deliverAt).toBe("2026-05-10T19:00:00Z");
+    expect((f as any).deliveryDetails.recipient.displayName).toBe("Jane");
+    expect((f as any).deliveryDetails.recipient.phoneNumber).toBe("650-555-0100");
+    expect((f as any).deliveryDetails.note).toBe("Apt 4B");
+    expect((f as any).pickupDetails).toBeUndefined();
+  });
+
+  it("defaults to PICKUP fulfillment when fulfillment is omitted", () => {
+    const payload = buildOrderPayload(baseRequest, "LOC_TEST");
+    expect(payload.order.fulfillments![0].type).toBe("PICKUP");
+  });
+
   it("emits a sibling ad-hoc Cannoli Kit line right after a kit-bearing cannoli line", () => {
     const payload = buildOrderPayload(
       {

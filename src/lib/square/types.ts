@@ -176,6 +176,11 @@ export type OrderRequest = {
   idempotencyKey: string;
   sourceId?: string;
   payAtPickup?: boolean;
+  // "delivery" routes the Square fulfillment to type=DELIVERY so it lands in
+  // the Delivery section on POS. Address/phone still ride along in the order
+  // note (set client-side) because the store calls the customer to confirm
+  // before scheduling. Defaults to pickup when omitted.
+  fulfillment?: "pickup" | "delivery";
   pickupAt: string;
   contact: { name: string; phone: string; email: string };
   // Order-level customer note (entered on the Review step). Threads through

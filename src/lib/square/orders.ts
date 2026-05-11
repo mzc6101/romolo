@@ -52,6 +52,43 @@ export function buildOrderLineItems(
 
 export function buildOrderPayload(req: OrderRequest, locationId: string) {
   const note = req.note?.trim();
+  const recipient = {
+    displayName: req.contact.name,
+    emailAddress: req.contact.email,
+    phoneNumber: req.contact.phone,
+  };
+  // DELIVERY routes the order to the Delivery section on POS. Address/phone
+  // still ride along in the order note (set client-side) because the store
+  // calls the customer to confirm before scheduling — we don't pass a
+  // structured recipient address to Square.
+  const fulfillment =
+    req.fulfillment === "delivery"
+      ? {
+          type: "DELIVERY" as const,
+          state: "PROPOSED" as const,
+          deliveryDetails: {
+            deliverAt: req.pickupAt,
+            recipient,
+            ...(note ? { note } : {}),
+          },
+        }
+      : {
+          type: "PICKUP" as const,
+          state: "PROPOSED" as const,
+          pickupDetails: {
+            pickupAt: req.pickupAt,
+            recipient,
+            // Pickup-level customer note. We tried `order.note` first, but
+            // the Square Node SDK's Fern-generated Order serializer doesn't
+            // declare `note` on its Raw schema and silently strips unknown
+            // fields, so the value never reaches Square. PickupDetails.note
+            // IS in the SDK schema (max 500 chars) and surfaces on the
+            // dashboard order detail and kitchen ticket as the pickup
+            // instruction note. Omitted when blank so an empty note doesn't
+            // clutter the dashboard.
+            ...(note ? { note } : {}),
+          },
+        };
   return {
     idempotencyKey: req.idempotencyKey,
     order: {
@@ -64,29 +101,7 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
         autoApplyDiscounts: true,
       },
       lineItems: buildOrderLineItems(req.lines),
-      fulfillments: [
-        {
-          type: "PICKUP" as const,
-          state: "PROPOSED" as const,
-          pickupDetails: {
-            pickupAt: req.pickupAt,
-            recipient: {
-              displayName: req.contact.name,
-              emailAddress: req.contact.email,
-              phoneNumber: req.contact.phone,
-            },
-            // Pickup-level customer note. We tried `order.note` first, but
-            // the Square Node SDK's Fern-generated Order serializer doesn't
-            // declare `note` on its Raw schema and silently strips unknown
-            // fields, so the value never reaches Square. PickupDetails.note
-            // IS in the SDK schema (max 500 chars) and surfaces on the
-            // dashboard order detail and kitchen ticket as the pickup
-            // instruction note. Omitted when blank so an empty note doesn't
-            // clutter the dashboard.
-            ...(note ? { note } : {}),
-          },
-        },
-      ],
+      fulfillments: [fulfillment],
     },
   };
 }
