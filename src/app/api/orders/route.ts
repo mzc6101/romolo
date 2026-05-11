@@ -29,7 +29,6 @@ const bodySchema = z.object({
   idempotencyKey: z.string().min(1).max(64),
   sourceId: z.string().min(1).optional(),
   payAtPickup: z.boolean().optional(),
-  fulfillment: z.enum(["pickup", "delivery"]).optional(),
   pickupAt: z.string().datetime(),
   contact: z.object({
     name: z.string().min(1).max(100),

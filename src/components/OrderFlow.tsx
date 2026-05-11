@@ -606,7 +606,6 @@ export default function OrderFlow() {
         idempotencyKey,
         ...(sourceId ? { sourceId } : {}),
         ...(order.paymentMethod === "pickup" ? { payAtPickup: true } : {}),
-        fulfillment: order.fulfillment,
         pickupAt,
         contact: order.contact,
         lines: order.lines.map((l) => buildLinePayload(l, snapshot)),
