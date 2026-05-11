@@ -1468,7 +1468,7 @@ function OrderLineEditor({
             <button
               type="button"
               onClick={clearItem}
-              className="text-[11px] tracking-[0.12em] uppercase text-romolo-warm-gray hover:text-romolo-red transition-colors underline-offset-4 hover:underline"
+              className="text-[11px] tracking-[0.12em] uppercase text-romolo-red transition-colors underline-offset-4 hover:underline"
             >
               Change
             </button>
@@ -1613,7 +1613,7 @@ function OrderLineEditor({
                     : "bg-romolo-cream text-romolo-warm-gray border-romolo-border hover:border-romolo-charcoal"
                 }`}
               >
-                Choose your own
+                Choose your set size
               </button>
             )}
           </div>
