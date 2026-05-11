@@ -21,6 +21,9 @@ const SHELL_STEP_IMAGES: Record<string, string> = {
     "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467866/_N8Z0614_gpzzbg.jpg",
 };
 
+const FILLING_STEP_IMAGE =
+  "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679595/_N8Z0582_yktkoz.jpg";
+
 const GARNISH_STEP_IMAGES: Record<string, string> = {
   Pistachio:
     "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467921/_N8Z0629_cpoars.jpg",
@@ -44,6 +47,7 @@ export default function Menu() {
   const [galleryItem, setGalleryItem] = useState<MenuItem | null>(null);
   const [sizeChoice, setSizeChoice] = useState("Full Size");
   const [shellChoice, setShellChoice] = useState("Chocolate");
+  const [fillingChoice, setFillingChoice] = useState("Original Ricotta");
   const [garnishChoice, setGarnishChoice] = useState("Pistachio");
 
   return (
@@ -196,6 +200,14 @@ export default function Menu() {
                       className="object-cover"
                       sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 90vw"
                     />
+                  ) : s.step === 3 ? (
+                    <Image
+                      src={FILLING_STEP_IMAGE}
+                      alt={`${fillingChoice} filling`}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 90vw"
+                    />
                   ) : s.step === 4 ? (
                     <Image
                       src={GARNISH_STEP_IMAGES[garnishChoice]}
@@ -221,7 +233,10 @@ export default function Menu() {
                 <div
                   className="flex flex-wrap gap-1.5 mt-3"
                   role={
-                    s.step === 1 || s.step === 2 || s.step === 4
+                    s.step === 1 ||
+                    s.step === 2 ||
+                    s.step === 3 ||
+                    s.step === 4
                       ? "radiogroup"
                       : undefined
                   }
@@ -230,21 +245,28 @@ export default function Menu() {
                       ? "Cannoli size"
                       : s.step === 2
                         ? "Cannoli shell"
-                        : s.step === 4
-                          ? "Cannoli garnish"
-                          : undefined
+                        : s.step === 3
+                          ? "Cannoli filling"
+                          : s.step === 4
+                            ? "Cannoli garnish"
+                            : undefined
                   }
                 >
                   {s.choices.map((c) => {
                     const interactive =
-                      s.step === 1 || s.step === 2 || s.step === 4;
+                      s.step === 1 ||
+                      s.step === 2 ||
+                      s.step === 3 ||
+                      s.step === 4;
                     if (interactive) {
                       const selected =
                         s.step === 1
                           ? sizeChoice === c
                           : s.step === 2
                             ? shellChoice === c
-                            : garnishChoice === c;
+                            : s.step === 3
+                              ? fillingChoice === c
+                              : garnishChoice === c;
                       return (
                         <button
                           key={c}
@@ -254,6 +276,7 @@ export default function Menu() {
                           onClick={() => {
                             if (s.step === 1) setSizeChoice(c);
                             else if (s.step === 2) setShellChoice(c);
+                            else if (s.step === 3) setFillingChoice(c);
                             else setGarnishChoice(c);
                           }}
                           className={choiceChipClass(selected)}
