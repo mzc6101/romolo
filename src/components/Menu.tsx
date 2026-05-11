@@ -6,9 +6,45 @@ import { MENU_DATA, type MenuItem } from "@/lib/data";
 import { useOrder } from "./OrderProvider";
 import { MenuGalleryModal } from "./MenuGalleryModal";
 
+const SIZE_STEP_IMAGES: Record<string, string> = {
+  "Full Size":
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679870/_N8Z0944_odj3da.jpg",
+  Mini: "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328556/_N8Z0787_acdfse.jpg",
+  "Kit (6-pack)":
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1775679842/_N8Z0606_wcehwu.jpg",
+};
+
+const SHELL_STEP_IMAGES: Record<string, string> = {
+  Chocolate:
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208596/_N8Z0617_rlml9t.jpg",
+  Plain:
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467866/_N8Z0614_gpzzbg.jpg",
+};
+
+const GARNISH_STEP_IMAGES: Record<string, string> = {
+  Pistachio:
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467921/_N8Z0629_cpoars.jpg",
+  "Chocolate Chips":
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467920/_N8Z0618_dfqpbd.jpg",
+  Toffee:
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467923/_N8Z0638_svfpra.jpg",
+  Cherries:
+    "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778467924/_N8Z0635_wb1pws.jpg",
+};
+
+const choiceChipClass = (selected: boolean) =>
+  `px-3 py-1.5 text-[12px] rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-romolo-red/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
+    selected
+      ? "border-romolo-red bg-romolo-red/[0.06] text-romolo-charcoal font-medium"
+      : "text-romolo-warm-gray border-romolo-border hover:border-romolo-red/40 hover:text-romolo-charcoal"
+  }`;
+
 export default function Menu() {
   const { open } = useOrder();
   const [galleryItem, setGalleryItem] = useState<MenuItem | null>(null);
+  const [sizeChoice, setSizeChoice] = useState("Full Size");
+  const [shellChoice, setShellChoice] = useState("Chocolate");
+  const [garnishChoice, setGarnishChoice] = useState("Pistachio");
 
   return (
     <>
@@ -144,9 +180,35 @@ export default function Menu() {
             ].map((s) => (
               <div key={s.step} className="animate-on-scroll">
                 <div className="relative aspect-[4/3] w-full rounded-sm overflow-hidden bg-romolo-cream border border-romolo-border mb-5 flex items-center justify-center">
-                  <span className="font-[var(--font-serif)] text-6xl font-light text-romolo-border">
-                    {s.step}
-                  </span>
+                  {s.step === 1 ? (
+                    <Image
+                      src={SIZE_STEP_IMAGES[sizeChoice]}
+                      alt={`${sizeChoice} cannoli`}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 90vw"
+                    />
+                  ) : s.step === 2 ? (
+                    <Image
+                      src={SHELL_STEP_IMAGES[shellChoice]}
+                      alt={`${shellChoice} cannoli shell`}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 90vw"
+                    />
+                  ) : s.step === 4 ? (
+                    <Image
+                      src={GARNISH_STEP_IMAGES[garnishChoice]}
+                      alt={`${garnishChoice} garnish`}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 22vw, (min-width: 768px) 45vw, 90vw"
+                    />
+                  ) : (
+                    <span className="font-[var(--font-serif)] text-6xl font-light text-romolo-border">
+                      {s.step}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-baseline gap-3 mb-2">
                   <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-romolo-red text-white text-[13px] font-bold shrink-0">
@@ -156,15 +218,59 @@ export default function Menu() {
                     {s.label}
                   </h4>
                 </div>
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {s.choices.map((c) => (
-                    <span
-                      key={c}
-                      className="px-3 py-1.5 text-[12px] text-romolo-warm-gray border border-romolo-border rounded-full"
-                    >
-                      {c}
-                    </span>
-                  ))}
+                <div
+                  className="flex flex-wrap gap-1.5 mt-3"
+                  role={
+                    s.step === 1 || s.step === 2 || s.step === 4
+                      ? "radiogroup"
+                      : undefined
+                  }
+                  aria-label={
+                    s.step === 1
+                      ? "Cannoli size"
+                      : s.step === 2
+                        ? "Cannoli shell"
+                        : s.step === 4
+                          ? "Cannoli garnish"
+                          : undefined
+                  }
+                >
+                  {s.choices.map((c) => {
+                    const interactive =
+                      s.step === 1 || s.step === 2 || s.step === 4;
+                    if (interactive) {
+                      const selected =
+                        s.step === 1
+                          ? sizeChoice === c
+                          : s.step === 2
+                            ? shellChoice === c
+                            : garnishChoice === c;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => {
+                            if (s.step === 1) setSizeChoice(c);
+                            else if (s.step === 2) setShellChoice(c);
+                            else setGarnishChoice(c);
+                          }}
+                          className={choiceChipClass(selected)}
+                        >
+                          {c}
+                        </button>
+                      );
+                    }
+                    return (
+                      <span
+                        key={c}
+                        className="px-3 py-1.5 text-[12px] text-romolo-warm-gray border border-romolo-border rounded-full"
+                      >
+                        {c}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             ))}
