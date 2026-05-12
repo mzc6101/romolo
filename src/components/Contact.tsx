@@ -68,7 +68,23 @@ export default function Contact() {
 
           {/* Right: Contact form */}
           <div className="animate-on-scroll delay-2">
-            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+            <form
+              className="space-y-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const data = new FormData(e.currentTarget);
+                const name = String(data.get("name") ?? "").trim();
+                const email = String(data.get("email") ?? "").trim();
+                const subject = String(data.get("subject") ?? "General Inquiry").trim();
+                const message = String(data.get("message") ?? "").trim();
+
+                const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
+                const mailto = `mailto:info@romoloscannoli.com?subject=${encodeURIComponent(
+                  `[Romolo Contact] ${subject}`
+                )}&body=${encodeURIComponent(body)}`;
+                window.location.href = mailto;
+              }}
+            >
               <div className="grid sm:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-2">
@@ -76,6 +92,8 @@ export default function Contact() {
                   </label>
                   <input
                     type="text"
+                    name="name"
+                    required
                     placeholder="Your name"
                     className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal placeholder:text-romolo-warm-gray/50 focus:outline-none focus:border-romolo-red/40 transition-colors"
                   />
@@ -86,6 +104,8 @@ export default function Contact() {
                   </label>
                   <input
                     type="email"
+                    name="email"
+                    required
                     placeholder="your@email.com"
                     className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal placeholder:text-romolo-warm-gray/50 focus:outline-none focus:border-romolo-red/40 transition-colors"
                   />
@@ -96,7 +116,11 @@ export default function Contact() {
                 <label className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-2">
                   Subject
                 </label>
-                <select className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal focus:outline-none focus:border-romolo-red/40 transition-colors appearance-none">
+                <select
+                  name="subject"
+                  defaultValue="General Inquiry"
+                  className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal focus:outline-none focus:border-romolo-red/40 transition-colors appearance-none"
+                >
                   <option>General Inquiry</option>
                   <option>Catering & Events</option>
                   <option>Wholesale</option>
@@ -110,6 +134,8 @@ export default function Contact() {
                 </label>
                 <textarea
                   rows={5}
+                  name="message"
+                  required
                   placeholder="Tell us what's on your mind..."
                   className="w-full px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm text-romolo-charcoal placeholder:text-romolo-warm-gray/50 focus:outline-none focus:border-romolo-red/40 transition-colors resize-none"
                 />
