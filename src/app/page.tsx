@@ -18,6 +18,11 @@ import { getLocationProfile } from "@/lib/square/location";
 import { squareLocationId } from "@/lib/square/client";
 import type { MenuSnapshot } from "@/lib/square/types";
 import { getReviews } from "@/lib/reviews";
+import { JsonLd } from "@/lib/seo/JsonLd";
+import {
+  buildLocalBusinessSchema,
+  buildWebSiteSchema,
+} from "@/lib/seo/schema";
 
 // Render at request time so the build never calls Square (Railway injects
 // SQUARE_* env vars at runtime, not during `next build`). The 15-min cache
@@ -87,8 +92,14 @@ async function loadSnapshot(): Promise<MenuSnapshot> {
 export default async function Home() {
   const [snapshot, reviews] = await Promise.all([loadSnapshot(), getReviews()]);
 
+  const jsonLd = [
+    buildLocalBusinessSchema({ reviews }),
+    buildWebSiteSchema(),
+  ];
+
   return (
     <OrderProvider initialSnapshot={snapshot}>
+      <JsonLd data={jsonLd} />
       <ScrollAnimator />
       <Navbar />
       <main>

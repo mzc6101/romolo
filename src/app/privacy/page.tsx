@@ -2,18 +2,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "@/components/Footer";
+import { JsonLd } from "@/lib/seo/JsonLd";
+import { buildBreadcrumbSchema } from "@/lib/seo/schema";
+import { SITE_URL } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Romolo's Cannoli",
+  title: "Privacy Policy",
   description:
     "How Romolo's Cannoli collects, uses, and protects your personal information.",
+  alternates: { canonical: "/privacy" },
+  robots: { index: true, follow: true },
 };
+
+const breadcrumb = buildBreadcrumbSchema([
+  { name: "Home", url: `${SITE_URL}/` },
+  { name: "Privacy Policy", url: `${SITE_URL}/privacy` },
+]);
 
 const LAST_UPDATED = "May 8, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <JsonLd data={breadcrumb} />
       <header className="border-b border-romolo-border">
         <div className="max-w-3xl mx-auto px-6 lg:px-10 h-18 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">

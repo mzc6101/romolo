@@ -2,18 +2,29 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "@/components/Footer";
+import { JsonLd } from "@/lib/seo/JsonLd";
+import { buildBreadcrumbSchema } from "@/lib/seo/schema";
+import { SITE_URL } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Romolo's Cannoli",
+  title: "Terms of Service",
   description:
-    "Terms governing your use of romolocannoli.com and orders placed with Romolo's Cannoli.",
+    "Terms governing your use of romoloscannoli.com and orders placed with Romolo's Cannoli.",
+  alternates: { canonical: "/terms" },
+  robots: { index: true, follow: true },
 };
+
+const breadcrumb = buildBreadcrumbSchema([
+  { name: "Home", url: `${SITE_URL}/` },
+  { name: "Terms of Service", url: `${SITE_URL}/terms` },
+]);
 
 const LAST_UPDATED = "May 8, 2026";
 
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <JsonLd data={breadcrumb} />
       <header className="border-b border-romolo-border">
         <div className="max-w-3xl mx-auto px-6 lg:px-10 h-18 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
