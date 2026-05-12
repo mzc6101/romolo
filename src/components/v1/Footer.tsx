@@ -50,8 +50,8 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:hello@romolocannoli.com" className="hover:text-[#d4a574] transition-colors">
-                  hello@romolocannoli.com
+                <a href="mailto:info@romoloscannoli.com" className="hover:text-[#d4a574] transition-colors">
+                  info@romoloscannoli.com
                 </a>
               </li>
             </ul>

@@ -88,7 +88,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[#1a1a1a]">Email</p>
-                  <p className="text-sm text-[#8a7e75]">hello@romolocannoli.com</p>
+                  <p className="text-sm text-[#8a7e75]">info@romoloscannoli.com</p>
                 </div>
               </div>
 

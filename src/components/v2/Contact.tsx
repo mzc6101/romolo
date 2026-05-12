@@ -32,7 +32,7 @@ export default function Contact() {
                 </svg>
               </div>
               <p className="text-sm font-medium text-[#1a1a1a] mb-1">Email</p>
-              <p className="text-sm text-[#5a6b5e]">hello@romolocannoli.com</p>
+              <p className="text-sm text-[#5a6b5e]">info@romoloscannoli.com</p>
             </div>
 
             <div className="flex flex-col items-center text-center p-6 rounded-sm bg-[#f1faee] border border-[#c9d5c7]">

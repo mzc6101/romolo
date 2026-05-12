@@ -186,10 +186,10 @@ export default function PrivacyPolicyPage() {
               <p className="mt-3">
                 To exercise any of these rights, email us at{" "}
                 <a
-                  href="mailto:hello@romolocannoli.com"
+                  href="mailto:info@romoloscannoli.com"
                   className="text-romolo-red hover:underline"
                 >
-                  hello@romolocannoli.com
+                  info@romoloscannoli.com
                 </a>
                 .
               </p>
@@ -247,10 +247,10 @@ export default function PrivacyPolicyPage() {
                 San Mateo, CA 94403
                 <br />
                 <a
-                  href="mailto:hello@romolocannoli.com"
+                  href="mailto:info@romoloscannoli.com"
                   className="text-romolo-red hover:underline"
                 >
-                  hello@romolocannoli.com
+                  info@romoloscannoli.com
                 </a>
                 <br />
                 <a

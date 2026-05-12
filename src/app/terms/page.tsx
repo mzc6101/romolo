@@ -137,10 +137,10 @@ export default function TermsOfServicePage() {
                 isn&apos;t right with your order, contact us as soon as
                 possible at{" "}
                 <a
-                  href="mailto:hello@romolocannoli.com"
+                  href="mailto:info@romoloscannoli.com"
                   className="text-romolo-red hover:underline"
                 >
-                  hello@romolocannoli.com
+                  info@romoloscannoli.com
                 </a>{" "}
                 or{" "}
                 <a
@@ -268,10 +268,10 @@ export default function TermsOfServicePage() {
                 San Mateo, CA 94403
                 <br />
                 <a
-                  href="mailto:hello@romolocannoli.com"
+                  href="mailto:info@romoloscannoli.com"
                   className="text-romolo-red hover:underline"
                 >
-                  hello@romolocannoli.com
+                  info@romoloscannoli.com
                 </a>
                 <br />
                 <a
