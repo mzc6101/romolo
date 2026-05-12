@@ -2242,7 +2242,11 @@ function StepDone({ order, onClose }: { order: Order; onClose: () => void }) {
         <strong className="text-romolo-charcoal">{order.confirmation}</strong> is in.{" "}
         {order.fulfillment === "delivery"
           ? "We'll call you to confirm delivery details."
-          : `We'll email ${order.contact.email || "you"} when it's ready to pick up.`}
+          : order.date && order.time
+            ? `Your order will be ready for pickup on ${prettyDate(order.date)} at ${order.time}.`
+            : order.date
+              ? `Your order will be ready for pickup on ${prettyDate(order.date)}.`
+              : "Your order will be ready for pickup at the time you selected."}
       </p>
       <div className="bg-romolo-cream border border-romolo-border rounded-sm p-4 text-left mb-5">
         <div className="text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray mb-1.5">
