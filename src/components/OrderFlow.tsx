@@ -191,6 +191,8 @@ const modifierListRank = (name: string): number => {
   return 0;
 };
 
+type TipChoice = "none" | "p15" | "p18" | "p20" | "custom";
+
 type Order = {
   date: string;
   time: string;
@@ -203,7 +205,31 @@ type Order = {
   contact: Contact;
   note: string;
   confirmation: string;
+  tipChoice: TipChoice;
+  // User-entered custom tip in cents. Only consulted when tipChoice="custom";
+  // kept around when switching between presets so toggling back to "custom"
+  // restores their last entered amount.
+  tipCustomCents: number;
 };
+
+const TIP_PERCENTS: Record<Exclude<TipChoice, "none" | "custom">, number> = {
+  p15: 0.15,
+  p18: 0.18,
+  p20: 0.20,
+};
+
+// Resolves the dollar-cents tip from the user's choice and the current
+// pre-tip total. Percent presets round to the nearest cent; custom is
+// clamped to >= 0.
+function deriveTipCents(
+  choice: TipChoice,
+  customCents: number,
+  baseCents: number,
+): number {
+  if (choice === "none") return 0;
+  if (choice === "custom") return Math.max(0, Math.round(customCents));
+  return Math.round(baseCents * TIP_PERCENTS[choice]);
+}
 
 const lineId = () => Math.random().toString(36).slice(2, 8);
 
@@ -289,6 +315,8 @@ const initialOrder = (): Order => ({
   contact: { name: "", phone: "", email: "" },
   note: "",
   confirmation: "",
+  tipChoice: "none",
+  tipCustomCents: 0,
 });
 
 // Closing the modal (or the whole tab) shouldn't wipe an in-progress cart.
@@ -325,6 +353,15 @@ function loadPersistedCart(): PersistedCart | null {
         deliveryAddress: o.deliveryAddress || "",
         deliveryPhone: o.deliveryPhone || "",
         paymentMethod: o.paymentMethod || "card",
+        tipChoice: (["none", "p15", "p18", "p20", "custom"] as const).includes(
+          o.tipChoice,
+        )
+          ? o.tipChoice
+          : "none",
+        tipCustomCents:
+          typeof o.tipCustomCents === "number" && o.tipCustomCents >= 0
+            ? Math.round(o.tipCustomCents)
+            : 0,
       },
     };
   } catch {
@@ -519,6 +556,12 @@ export default function OrderFlow() {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const totals = useCalculatedTotals(order, snapshot);
   const lineTotals = totals?.lineTotals ?? {};
+  // Tip only applies to "Pay now" — pickup pay-on-arrival orders tip in
+  // person, and delivery is always pay-at-pickup-style (no tip prompt).
+  const tipCents =
+    order.paymentMethod === "card" && order.fulfillment !== "delivery"
+      ? deriveTipCents(order.tipChoice, order.tipCustomCents, totals?.totalCents ?? 0)
+      : 0;
 
   // Reset transient UI state every time the modal opens. Cart contents
   // (order + step) deliberately survive across opens so a user who closes
@@ -610,6 +653,7 @@ export default function OrderFlow() {
         contact: order.contact,
         lines: order.lines.map((l) => buildLinePayload(l, snapshot)),
         ...(finalNote ? { note: finalNote } : {}),
+        ...(tipCents > 0 ? { tipCents } : {}),
       }),
     });
 
@@ -717,6 +761,7 @@ export default function OrderFlow() {
               setOrder={setOrder}
               setCardHandle={setCardHandle}
               errorBanner={errorBanner}
+              totals={totals}
             />
           )}
           {step === 5 && <StepDone order={order} onClose={handleClose} />}
@@ -725,7 +770,7 @@ export default function OrderFlow() {
         {/* Footer */}
         {step < 5 && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 sm:px-6 border-t border-romolo-border bg-romolo-cream">
-            <OrderSummary totals={totals} />
+            <OrderSummary totals={totals} tipCents={tipCents} />
             <div className="flex gap-2.5">
               {step > 0 && (
                 <button
@@ -2101,11 +2146,13 @@ function StepPay({
   setOrder,
   setCardHandle,
   errorBanner,
+  totals,
 }: {
   order: Order;
   setOrder: (o: Order) => void;
   setCardHandle: (h: SquareCardHandle | null) => void;
   errorBanner: string | null;
+  totals: CalculatedTotals | null;
 }) {
   return (
     <div>
@@ -2173,7 +2220,7 @@ function StepPay({
       </div>
       <input
         className="w-full mb-5 px-4 py-3 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
-        placeholder="Email — for the receipt"
+        placeholder="Email"
         type="email"
         value={order.contact.email}
         onChange={(e) =>
@@ -2183,11 +2230,107 @@ function StepPay({
 
       {order.paymentMethod === "card" && (
         <>
+          <TipPicker
+            choice={order.tipChoice}
+            customCents={order.tipCustomCents}
+            baseCents={totals?.totalCents ?? 0}
+            onChange={(choice, customCents) =>
+              setOrder({ ...order, tipChoice: choice, tipCustomCents: customCents })
+            }
+          />
           <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
             Card details
           </h5>
           <SquareCard onReady={(h) => setCardHandle(h)} />
         </>
+      )}
+    </div>
+  );
+}
+
+function TipPicker({
+  choice,
+  customCents,
+  baseCents,
+  onChange,
+}: {
+  choice: TipChoice;
+  customCents: number;
+  baseCents: number;
+  onChange: (choice: TipChoice, customCents: number) => void;
+}) {
+  // Local string state for the custom $ input so the user can clear / type
+  // partial values without us round-tripping through cents on every keystroke.
+  const [customDraft, setCustomDraft] = useState(
+    customCents > 0 ? (customCents / 100).toFixed(2) : "",
+  );
+
+  const buttons: Array<{ key: TipChoice; label: string }> = [
+    { key: "none", label: "No tip" },
+    { key: "p15", label: "15%" },
+    { key: "p18", label: "18%" },
+    { key: "p20", label: "20%" },
+    { key: "custom", label: "Custom" },
+  ];
+
+  return (
+    <div className="mb-5">
+      <h5 className="block text-[11px] tracking-[0.15em] uppercase text-romolo-warm-gray font-medium mb-2">
+        Add a tip
+      </h5>
+      <div className="grid grid-cols-5 gap-2">
+        {buttons.map((b) => {
+          const active = choice === b.key;
+          const sub =
+            b.key === "p15" || b.key === "p18" || b.key === "p20"
+              ? fmtCents(Math.round(baseCents * TIP_PERCENTS[b.key]))
+              : null;
+          return (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => onChange(b.key, customCents)}
+              className={`py-2.5 px-1 rounded-sm text-[12px] font-semibold tracking-[0.05em] uppercase transition-all border leading-tight ${
+                active
+                  ? "bg-romolo-charcoal text-white border-romolo-charcoal"
+                  : "bg-white text-romolo-charcoal border-romolo-border hover:border-romolo-red/40"
+              }`}
+            >
+              <div>{b.label}</div>
+              {sub && (
+                <div
+                  className={`text-[10px] font-normal mt-0.5 ${active ? "text-white/70" : "text-romolo-warm-gray"}`}
+                >
+                  {sub}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {choice === "custom" && (
+        <div className="mt-2 relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-romolo-warm-gray pointer-events-none">
+            $
+          </span>
+          <input
+            className="w-full pl-7 pr-4 py-2.5 bg-romolo-cream border border-romolo-border rounded-sm text-sm focus:outline-none focus:border-romolo-red/40"
+            placeholder="0.00"
+            inputMode="decimal"
+            value={customDraft}
+            onChange={(e) => {
+              const v = e.target.value;
+              // Allow empty, digits, and one decimal with up to 2 places.
+              if (!/^\d*(\.\d{0,2})?$/.test(v)) return;
+              setCustomDraft(v);
+              const dollars = v === "" || v === "." ? 0 : parseFloat(v);
+              const cents = Number.isFinite(dollars)
+                ? Math.round(dollars * 100)
+                : 0;
+              onChange("custom", cents);
+            }}
+          />
+        </div>
       )}
     </div>
   );
@@ -2345,14 +2488,26 @@ function useCalculatedTotals(order: Order, snapshot: MenuSnapshot): CalculatedTo
   return totals;
 }
 
-function OrderSummary({ totals }: { totals: CalculatedTotals | null }) {
-  const totalCents = totals?.totalCents ?? 0;
+function OrderSummary({
+  totals,
+  tipCents,
+}: {
+  totals: CalculatedTotals | null;
+  tipCents: number;
+}) {
+  const subtotalCents = totals?.totalCents ?? 0;
+  const grandCents = subtotalCents + tipCents;
   return (
     <div className="text-[13px] text-romolo-warm-gray leading-tight">
       <div className="text-[11px] tracking-[0.15em] uppercase">Order total</div>
       <div className="font-[var(--font-serif)] text-[22px] font-semibold text-romolo-charcoal">
-        {fmtCents(totalCents)}
+        {fmtCents(grandCents)}
       </div>
+      {tipCents > 0 && (
+        <div className="text-[11px] text-romolo-warm-gray mt-0.5">
+          Includes {fmtCents(tipCents)} tip
+        </div>
+      )}
     </div>
   );
 }

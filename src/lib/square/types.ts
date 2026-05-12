@@ -182,6 +182,11 @@ export type OrderRequest = {
   // to Square as order.note — the kitchen ticket header. Per-line freeText
   // notes still attach to their respective line items separately.
   note?: string;
+  // Tip in cents — only honored on the card path. Passed straight through
+  // to payments.create as tip_money (Square's native tip primitive — shows
+  // up in tip reporting and on the dashboard payment row), so the order
+  // total stays subtotal-only and the buyer is charged amount + tip.
+  tipCents?: number;
   lines: Array<{
     // Stable per-cart-line id passed through to Square as line_item.uid so
     // the calculate response can be joined back to cart lines for per-line

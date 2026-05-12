@@ -137,10 +137,20 @@ export async function createOrderAndPayment(
         };
       }
     } else {
+      // tip_money is Square's native primitive for buyer-added gratuity on
+      // a card payment. amount_money still has to equal order.total_money
+      // (Square's order-payment constraint), and tip rides on top — buyer
+      // is charged amount + tip and Square attributes the tip in tip
+      // reporting. Only attached when > 0 so non-tipping orders look the
+      // same as before.
+      const tipCents = req.tipCents ?? 0;
       const { payment } = await client.payments.create({
         sourceId: req.sourceId!,
         idempotencyKey: req.idempotencyKey + "-pay",
         amountMoney: { amount: totalAmount, currency: "USD" },
+        ...(tipCents > 0
+          ? { tipMoney: { amount: BigInt(tipCents), currency: "USD" } }
+          : {}),
         locationId,
         orderId,
         autocomplete: true,

@@ -37,9 +37,19 @@ const bodySchema = z.object({
   }),
   note: z.string().max(500).optional(),
   lines: z.array(lineSchema).min(1),
+  // Tip in cents — passed through to payments.create as tip_money (Square's
+  // native tip primitive: amount_money still equals order.total_money, tip
+  // rides on top, surfaces in tip reporting). Capped at $500 to bound a
+  // stray client-side typo.
+  tipCents: z.number().int().min(0).max(50_000).optional(),
 }).refine(
   (d) => d.payAtPickup || (d.sourceId && d.sourceId.length > 0),
   { message: "sourceId is required when not paying at pickup", path: ["sourceId"] },
+).refine(
+  // Pay-at-pickup orders always tip in person; reject any tip that sneaks
+  // through with payAtPickup=true rather than silently dropping it.
+  (d) => !(d.payAtPickup && d.tipCents && d.tipCents > 0),
+  { message: "Tip is only accepted when paying now", path: ["tipCents"] },
 );
 
 export async function POST(req: Request) {
