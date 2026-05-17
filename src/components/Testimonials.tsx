@@ -145,7 +145,13 @@ function FilterChip({
   );
 }
 
+const TRUNCATE_AT = 280;
+
 function ReviewCard({ r, delay }: { r: LiveReview; delay: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = r.text.length > TRUNCATE_AT;
+  const display = !isLong || expanded ? r.text : truncateAtWord(r.text, TRUNCATE_AT);
+
   return (
     <article
       className={`bg-white border border-romolo-border rounded-2xl p-6 relative animate-on-scroll delay-${delay}`}
@@ -164,10 +170,25 @@ function ReviewCard({ r, delay }: { r: LiveReview; delay: number }) {
         <SourceLogo s={r.source} large />
       </div>
       <p className="font-[var(--font-serif)] text-[17px] leading-relaxed text-romolo-charcoal italic m-0">
-        &ldquo;{r.text}&rdquo;
+        &ldquo;{display}{!expanded && isLong ? "…" : ""}&rdquo;
       </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 text-[11px] tracking-[0.1em] uppercase text-romolo-red font-semibold hover:text-romolo-charcoal transition-colors"
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      )}
     </article>
   );
+}
+
+function truncateAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const slice = text.slice(0, max);
+  const lastSpace = slice.lastIndexOf(" ");
+  return lastSpace > max * 0.7 ? slice.slice(0, lastSpace) : slice;
 }
 
 function SourceLogo({ s, large }: { s: "google" | "yelp"; large?: boolean }) {
