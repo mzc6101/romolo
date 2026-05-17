@@ -265,7 +265,7 @@ export const INITIAL_FLAVORS: Flavor[] = [
 ];
 
 export type Review = {
-  source: "google" | "yelp";
+  source: "google";
   author: string;
   avatar: string;
   rating: number;
@@ -283,28 +283,12 @@ export const REVIEWS: Review[] = [
     text: "The best cannoli I've ever had outside of Sicily. That shell — my God — it shatters like a dream. Romolo's is the real deal. Joe filled mine while I watched and the ricotta was so fresh.",
   },
   {
-    source: "yelp",
-    author: "Giuseppe T.",
-    avatar: "GT",
-    rating: 5,
-    date: "1 month ago",
-    text: "I brought my Nonna here and she cried. She said it tasted exactly like home. That's the highest compliment you can get. We left with a dozen and they didn't make it back to the car.",
-  },
-  {
     source: "google",
     author: "The Bianchi Family",
     avatar: "BF",
     rating: 5,
     date: "3 weeks ago",
     text: "We've been ordering the Cannoli Box for every family gathering for the past fifteen years. It wouldn't be a celebration without Romolo's. The pistachio rotation last weekend was unreal.",
-  },
-  {
-    source: "yelp",
-    author: "Aaron L.",
-    avatar: "AL",
-    rating: 5,
-    date: "2 months ago",
-    text: "Stopped in on a whim — ended up coming back three days in a row. The strawberry filling is something else when they have it. Worth the drive from the city.",
   },
 ];
 

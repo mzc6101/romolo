@@ -22,19 +22,13 @@ const DAY_NAME_TO_SCHEMA: Record<string, string> = {
 export function buildAggregateRating(
   bundle?: ReviewsBundle,
 ): AggregateRating | undefined {
-  if (!bundle) return undefined;
-  const g = bundle.google;
-  const y = bundle.yelp;
-  const gTotal = g?.total ?? 0;
-  const yTotal = y?.total ?? 0;
-  const total = gTotal + yTotal;
-  if (total === 0) return undefined;
-  const weighted = ((g?.rating ?? 0) * gTotal + (y?.rating ?? 0) * yTotal) / total;
-  const rounded = Math.round(weighted * 10) / 10;
+  const g = bundle?.google;
+  if (!g || g.total === 0) return undefined;
+  const rounded = Math.round(g.rating * 10) / 10;
   return {
     "@type": "AggregateRating",
     ratingValue: rounded,
-    reviewCount: total,
+    reviewCount: g.total,
     bestRating: 5,
     worstRating: 1,
   };

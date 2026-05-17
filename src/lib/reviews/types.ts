@@ -1,4 +1,4 @@
-export type ReviewSource = "google" | "yelp";
+export type ReviewSource = "google";
 
 export type LiveReview = {
   source: ReviewSource;
@@ -12,6 +12,5 @@ export type LiveReview = {
 export type ReviewsBundle = {
   reviews: LiveReview[];
   google?: { rating: number; total: number };
-  yelp?: { rating: number; total: number };
   source: "live" | "fallback";
 };

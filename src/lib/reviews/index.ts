@@ -1,43 +1,24 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { REVIEWS as STATIC_FALLBACK } from "@/lib/data";
-import type { LiveReview, ReviewsBundle } from "./types";
+import type { ReviewsBundle } from "./types";
 import { fetchGoogleReviews } from "./google";
-import { fetchYelpReviews } from "./yelp";
 
-const CACHE_SECONDS = 900;
+const CACHE_SECONDS = 86400;
 
 const cachedBundle = unstable_cache(
   async (): Promise<ReviewsBundle | null> => {
-    const [g, y] = await Promise.allSettled([
-      fetchGoogleReviews(),
-      fetchYelpReviews(),
-    ]);
-
-    const gOk = g.status === "fulfilled";
-    const yOk = y.status === "fulfilled";
-
-    if (!gOk && !yOk) return null;
-
-    const reviews: LiveReview[] = [
-      ...(gOk ? g.value.reviews : []),
-      ...(yOk ? y.value.reviews : []),
-    ];
-
+    const g = await fetchGoogleReviews();
     return {
-      reviews,
+      reviews: g.reviews,
       google:
-        gOk && g.value.rating !== null && g.value.total !== null
-          ? { rating: g.value.rating, total: g.value.total }
-          : undefined,
-      yelp:
-        yOk && y.value.rating !== null && y.value.total !== null
-          ? { rating: y.value.rating, total: y.value.total }
+        g.rating !== null && g.total !== null
+          ? { rating: g.rating, total: g.total }
           : undefined,
       source: "live",
     };
   },
-  ["reviews-live"],
+  ["reviews-live", "v2"],
   { revalidate: CACHE_SECONDS },
 );
 

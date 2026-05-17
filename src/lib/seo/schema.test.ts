@@ -15,7 +15,7 @@ describe("buildAggregateRating", () => {
     expect(buildAggregateRating(emptyBundle)).toBeUndefined();
   });
 
-  it("uses google only when yelp is absent", () => {
+  it("emits aggregate from google totals", () => {
     const rating = buildAggregateRating({
       ...emptyBundle,
       google: { rating: 4.8, total: 200 },
@@ -29,34 +29,13 @@ describe("buildAggregateRating", () => {
     });
   });
 
-  it("uses yelp only when google is absent", () => {
+  it("rounds rating to one decimal", () => {
     const rating = buildAggregateRating({
       ...emptyBundle,
-      yelp: { rating: 4.5, total: 50 },
+      google: { rating: 4.85, total: 271 },
     });
-    expect(rating?.ratingValue).toBe(4.5);
-    expect(rating?.reviewCount).toBe(50);
-  });
-
-  it("weights both sources by review count", () => {
-    const rating = buildAggregateRating({
-      ...emptyBundle,
-      google: { rating: 5, total: 100 },
-      yelp: { rating: 4, total: 100 },
-    });
-    expect(rating?.ratingValue).toBe(4.5);
-    expect(rating?.reviewCount).toBe(200);
-  });
-
-  it("rounds to one decimal", () => {
-    const rating = buildAggregateRating({
-      ...emptyBundle,
-      google: { rating: 4.85, total: 100 },
-      yelp: { rating: 4.32, total: 50 },
-    });
-    // (4.85*100 + 4.32*50) / 150 = 4.673... → 4.7
-    expect(rating?.ratingValue).toBe(4.7);
-    expect(rating?.reviewCount).toBe(150);
+    expect(rating?.ratingValue).toBe(4.9);
+    expect(rating?.reviewCount).toBe(271);
   });
 });
 
