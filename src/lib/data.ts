@@ -172,8 +172,8 @@ export const MENU_DATA: MenuCategory[] = [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328772/_N8Z0935_ggdfvc.jpg",
         galleryUrls: [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328772/_N8Z0935_ggdfvc.jpg",
-          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328622/_N8Z0931_axesp2.jpg",
-          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328740/_N8Z0782_lir3xp.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1780880978/Gemini_Generated_Image_5tmzbs5tmzbs5tmz_d8tulb.png",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1780881048/Gemini_Generated_Image_kl1xsjkl1xsjkl1x_r4oyv5.png",
         ],
       },
       {
@@ -186,7 +186,7 @@ export const MENU_DATA: MenuCategory[] = [
         galleryUrls: [
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1777328834/_N8Z0941_g0bjmw.jpg",
           "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778209283/_N8Z0939_th8imo.jpg",
-          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1778208102/_N8Z0653_yul3bg.jpg",
+          "https://res.cloudinary.com/dhv6sobkv/image/upload/q_auto/f_auto/v1780881139/Gemini_Generated_Image_9ais9g9ais9g9ais_kwgkg4.png",
         ],
       },
       {
