@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# local agent artifacts and one-off scripts
+/.pi/
+/scripts/find-delivery-order.ts
+
 # next.js
 /.next/
 /out/
