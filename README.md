@@ -69,6 +69,26 @@ Catalog and inventory are revalidated every 15 minutes via Next.js
 `revalidate: 900`. Sanity-check the integration after deploy via
 `GET /api/health`.
 
+### Christmas order sheet
+
+Completed website pickup orders for December 22–24 are appended to a Google
+spreadsheet tab named for the Pacific pickup year. Configure these server-only
+variables (the private key may contain literal `\\n` sequences):
+
+| Variable | Source |
+|---|---|
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | ID from the spreadsheet URL |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Google Cloud service-account JSON `client_email` |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Google Cloud service-account JSON `private_key` |
+
+Enable the Google Sheets API, share the destination spreadsheet with the
+service-account email as an Editor, and subscribe the existing signed Square
+webhook endpoint to `payment.updated` in addition to its catalog/inventory
+events. The service account creates missing year tabs; existing rows and owner
+edits are never overwritten. Dedupe check+append is serialized in-process for
+the single Railway replica; multiple replicas could still race and append the
+same Square ID.
+
 ## Live Reviews (Google + Yelp)
 
 The Reviews section pulls live data from Google Places and Yelp Fusion at

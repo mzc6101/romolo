@@ -26,6 +26,7 @@ describe("buildOrderPayload", () => {
     const payload = buildOrderPayload(baseRequest, "LOC_TEST");
     expect(payload.idempotencyKey).toBe("abc-123");
     expect(payload.order.locationId).toBe("LOC_TEST");
+    expect(payload.order.referenceId).toBe("romolo-website");
     expect(payload.order.lineItems).toEqual([
       {
         catalogObjectId: "VAR_COOKIES",

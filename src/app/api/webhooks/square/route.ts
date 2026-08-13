@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { handlePaymentUpdated } from "@/lib/christmas-export-handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +51,11 @@ export async function POST(req: Request) {
     return new Response("Invalid signature", { status: 401 });
   }
 
-  let event: { type?: string; event_id?: string };
+  let event: {
+    type?: string;
+    event_id?: string;
+    data?: { object?: { payment?: { id?: string } } };
+  };
   try {
     event = JSON.parse(rawBody);
   } catch {
@@ -61,9 +66,19 @@ export async function POST(req: Request) {
     // Next 16 requires a profile arg. expire:0 = purge immediately so the
     // next page render fetches a fresh catalog snapshot from Square.
     revalidateTag(CATALOG_TAG, { expire: 0 });
+    return new Response("ok", { status: 200 });
   }
 
-  // Always 200 quickly — Square retries on non-2xx and we don't want a
-  // transient handler error to keep replaying the same event.
+  if (event.type === "payment.updated") {
+    try {
+      await handlePaymentUpdated(event.data?.object?.payment?.id);
+    } catch (error) {
+      // Square retries non-2xx webhook deliveries. Canonical Square reads and
+      // Google writes are intentionally retryable rather than silently lost.
+      console.error("[square-webhook] Christmas export failed", error);
+      return new Response("Export failed", { status: 503 });
+    }
+  }
+
   return new Response("ok", { status: 200 });
 }

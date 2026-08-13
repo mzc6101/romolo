@@ -1,5 +1,6 @@
 import "server-only";
 import { squareClient, squareLocationId } from "./client";
+import { WEBSITE_ORDER_REFERENCE_ID } from "./website-order";
 import type { OrderRequest, OrderResult } from "./types";
 
 // Adapts a CartLine (one per cart row) into one or two Square line items:
@@ -56,6 +57,9 @@ export function buildOrderPayload(req: OrderRequest, locationId: string) {
     idempotencyKey: req.idempotencyKey,
     order: {
       locationId,
+      // Stable marker used by the Christmas export to exclude orders created
+      // in Square POS/Dashboard. Square SDK v44 declares Order.referenceId.
+      referenceId: WEBSITE_ORDER_REFERENCE_ID,
       // AUTOMATIC pricing rules (e.g. our cannoli quantity tiers) only fire
       // on API-created orders when this opt-in is set. Without it, Square
       // ignores the rules and charges the pre-discount total even though our
